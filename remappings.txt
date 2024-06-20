@@ -1,0 +1,4 @@
+@openzeppelin/=lib/openzeppelin-contracts/
+ds-test/=lib/forge-std/lib/ds-test/src/
+std/=lib/forge-std/src/
+@aerodrome/=lib/contracts/contracts
