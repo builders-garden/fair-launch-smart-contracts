@@ -2,14 +2,6 @@
 pragma solidity ^0.8.24;
 
 interface IHippodromeTypes {
-
-    event CampaignCreated(uint256 campaingID, CampaignParams campaign);
-
-    event FundedCampaign(address funder, uint256 campaignID);
-
-    event CampaignEnded(uint256 campaignID, bool success);
-
-
     struct Campaign{
         address founder;//═════════════════════════════╗ 
         uint96  poolSupply;//══════════════════════════╝
