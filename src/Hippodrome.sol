@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IHippodromeTypes} from "./types/HippodromeTypes.sol";
+import {IHippodrome} from "./interfaces/IHippodrome.sol";
 import {IAccountModule} from "./interfaces/IAccount.sol";
 import {ICollateralModule} from "./interfaces/ICollateralModule.sol";
 import {IVaultModule} from "./interfaces/IVault.sol";
 import {IRewardsManagerModule} from "./interfaces/IRewardsManagerModule.sol";
-import {xERC20Token} from "./xERC20Token.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/Token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@aerodrome/interfaces/factories/IPoolFactory.sol";
@@ -15,130 +13,88 @@ import "@aerodrome/interfaces/IPool.sol";
 import "@aerodrome/interfaces/IRouter.sol";
 
 
-contract Hippodrome is IERC721Receiver { 
-    address fUSDC = 0xc43708f8987Df3f3681801e5e640667D86Ce3C30;
-    address accountRouter = 0x764F4C95FDA0D6f8114faC54f6709b1B45f919a1;
-    address positionModule = 0xaD2fE7cd224c58871f541DAE01202F93928FEF72;
-    address sUSDC = 0x8069c44244e72443722cfb22DcE5492cba239d39;
-    address aerodromePoolFactory = 0x9F631b6E37045E0C66ed2d6AE28eEb53A5bda82D;
-    address aerodromeRouter = 0x70bD534579cbaBbE9Cd4AD4210e29CC9BA1E9287;
+contract Hippodrome is IERC721Receiver, IHippodrome { 
+
+    address internal fUSDC;
+    address internal accountRouter;
+    address internal positionModule;
+    address internal sUSDC;
+    address internal aerodromePoolFactory;
+    address internal aerodromeRouter;
     uint internal _campaignCounter;
-    address xERC20Implementation;
     uint128 internal _poolID = 1;
-  
-  
-    mapping(uint=>IHippodromeTypes.Campaign) s_campaigns;
+    
+    mapping(uint=>Campaign) s_campaigns;
     mapping(uint=>uint128) s_campaignAccounts;
     mapping(address=>mapping(uint128=>uint256)) s_userStakes;
     mapping(address=>mapping(uint128=>uint256)) s_contributions;
+    mapping(uint256 => Launch) public s_launches;
+    mapping(address => bool) internal s_tokens;
+    mapping(address=>mapping(uint128=>uint256)) s_claims;
+    mapping(address=>mapping(uint128=>uint256)) s_depositTimestamps;
+
+    constructor
+    (
+        address _accountRouter,
+        address _fUSDC, 
+        address _positionModule, 
+        address _sUSDC, 
+        address _aerodromePoolFactory, 
+        address _aerodromeRouter
+    ){
+        accountRouter = _accountRouter;
+        fUSDC = _fUSDC;
+        positionModule = _positionModule;
+        sUSDC = _sUSDC;
+        aerodromePoolFactory = _aerodromePoolFactory;
+        aerodromeRouter = _aerodromeRouter;
+    }
 
     
-
-    constructor(address _accountRouter) {
-        xERC20Implementation = address(new xERC20Token());
-        accountRouter = _accountRouter;
-    }
-
-
-     mapping(uint256 => Launch) public launches;
-
-
-    function stake(uint256 campaignID, uint256 amount) external {
-        require(amount > 0, "Amount must be greater than zero");
-
-        Launch storage launch = launches[campaignID];
-        UserStake storage userStake = launch.userStakes[msg.sender];
-
-        // Update global total contribution with elapsed time since last update
-        uint256 timeElapsed = block.timestamp - launch.lastUpdateTime;
-        if (launch.totalStaked > 0) {
-            launch.totalContribution += timeElapsed * launch.totalStaked;
-        }
-        launch.lastUpdateTime = block.timestamp;
-
-        // If user already has a stake, calculate their contribution up to this point
-        if (userStake.amount > 0) {
-            uint256 userTimeElapsed = block.timestamp - userStake.lastStakeTime;
-            userStake.totalContribution += userTimeElapsed * userStake.amount;
-        }
-
-        // Update user's stake and total staked
-        userStake.amount += amount;
-        userStake.lastStakeTime = block.timestamp;
-        launch.totalStaked += amount;
-
-        emit Staked(campaignID, msg.sender, amount);
-    }
-
-    function withdraw(uint256 campaignID, uint256 amount) external {
-        Launch storage launch = launches[campaignID];
-        UserStake storage userStake = launch.userStakes[msg.sender];
-        require(userStake.amount >= amount, "Insufficient staked amount");
-
-        // Update global total contribution with elapsed time since last update
-        uint256 timeElapsed = block.timestamp - launch.lastUpdateTime;
-        if (launch.totalStaked > 0) {
-            launch.totalContribution += timeElapsed * launch.totalStaked;
-        }
-        launch.lastUpdateTime = block.timestamp;
-
-        // Calculate user's contribution up to this point
-        uint256 userTimeElapsed = block.timestamp - userStake.lastStakeTime;
-        userStake.totalContribution += userTimeElapsed * userStake.amount;
-
-        // Update user's stake and total staked
-        userStake.amount -= amount;
-        userStake.lastStakeTime = block.timestamp;
-        launch.totalStaked -= amount;
-
-        // Assume transfer of the token amount back to the user in a real scenario
-
-        emit Withdrawn(campaignID, msg.sender, amount);
-    }
-
-    function getUserContribution(uint256 campaignID, address user) public view returns (uint256 userContribution) {
-        Launch storage launch = launches[campaignID];
-        UserStake storage userStake = launch.userStakes[user];
-        uint256 pastContribution = (block.timestamp - userStake.lastStakeTime) * userStake.amount;
-        userContribution = userStake.totalContribution + pastContribution;
-    }
-
-    function getTotalContribution(uint256 campaignID) public view returns (uint256 totalContribution) {
-        Launch storage launch = launches[campaignID];
-        uint256 pastContribution = (block.timestamp - launch.lastUpdateTime) * launch.totalStaked;
-        totalContribution = launch.totalContribution + pastContribution;
-    }
-
-    function calculateContributionPercentage(uint256 campaignID, address user) public view returns (uint256 percentage) {
-        uint256 userContribution = getUserContribution(campaignID, user);
-        uint256 totalContribution = getTotalContribution(campaignID);
-
-        require(totalContribution > 0, "Total contribution must be greater than zero");
-
-        // Percentage as 100000 for 100%
-        percentage = (userContribution * 100000) / totalContribution;
-    }
-
-
-
     //║══════════════════════════════════════════╗
     //║             USER FUNCTIONS               ║
     //║══════════════════════════════════════════╝
 
-    function createCampaign(IHippodromeTypes.CampaignParams memory campaignParams) public returns(uint128 accountID){
+    function createCampaign(CampaignParams memory campaignParams) public returns(uint128 accountID){
         ++_campaignCounter;
         accountID = _createContractAndAccount(campaignParams);
     }
     
-
-    
-    function fundCampaign(uint128 campaignID, uint amount, ) public {    
+    function fundCampaign(uint128 campaignID, uint amount ) public {    
         s_userStakes[msg.sender][campaignID] += amount;   
         _depositAndDelegateOnAccount(campaignID, amount);
     }
 
-    function claimRewards(uint128 campaignID) public {
+    function withdrawFunds(uint128 campaignID) public{
+        require(s_depositTimestamps[msg.sender][campaignID] < 10 days, "Synthetix claim period isn't  over");
+        // stuff
+    }
 
+    function claimRewards(uint128 campaignID) public {
+        uint rewards = getUserRewards(msg.sender, campaignID);
+        require(rewards > s_claims[msg.sender][campaignID], "Hippodrome: claimed");
+        Campaign memory campaign = s_campaigns[campaignID];
+      
+        // stream?
+        IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
+        s_claims[msg.sender][campaignID] = rewards;
+    }
+
+    //║══════════════════════════════════════════╗
+    //║             VIEW FUNCTIONS               ║
+    //║══════════════════════════════════════════╝
+
+    function getUserRewards(address user, uint128 campaignID) public view returns(uint rewards) {
+        uint contributionPercentage = calculateContributionPercentage(campaignID, user);
+        rewards = (uint(s_campaigns[campaignID].rewardSupply) * contributionPercentage ) / 100;
+    }
+
+    function calculateContributionPercentage(uint128 campaignID, address user) public view returns (uint256 percentage) {
+        uint256 userContribution = _getUserContribution(campaignID, user);
+        uint256 totalContribution = _getTotalContribution(campaignID);
+
+        require(totalContribution > 0, "Total contribution must be greater than zero");
+        percentage = (userContribution * 100000) / totalContribution;
     }
 
 
@@ -146,33 +102,32 @@ contract Hippodrome is IERC721Receiver {
     //║            INTERNAL FUNCTIONS            ║
     //║══════════════════════════════════════════╝
 
-    function seeCurrentRewards(uint128 campaignID) public {
+  
+    
 
-    }
 
-
-    function _createContractAndAccount(IHippodromeTypes.CampaignParams memory campaignParams) internal returns(uint128 accountID){
-        // clone implemntation
-        address clone = Clones.clone(xERC20Implementation);
-        // initialize clone contract
-        xERC20Token(clone).init(campaignParams.tokenName,campaignParams.tokenSymbol,campaignParams.allocatedSupply);
+    function _createContractAndAccount(CampaignParams memory campaignParams) internal returns(uint128 accountID){
+        // get tokens from founder
+        address campaignToken = campaignParams.tokenAddress;
+        IERC20(campaignToken).transferFrom(msg.sender, address(this), campaignParams.poolSupply);
+        
         // create Synthetix Account
         accountID = IAccountModule(accountRouter).createAccount();
         // map the id 
         s_campaignAccounts[_campaignCounter] = accountID;
         // map the campaign params
-        s_campaigns[_campaignCounter] = IHippodromeTypes.Campaign(
+        s_campaigns[_campaignCounter] = Campaign(
             msg.sender, 
-            campaignParams.allocatedSupply,
-            clone,
+            campaignParams.poolSupply,
+            campaignToken,
             0,
             address(0),
             0,
             campaignParams.startTimestamp,
             campaignParams.endTimestamp,
-            campaignParams.rewardSupplyRate,
             campaignParams.unvestingStreamStart, 
-            campaignParams.unvestingStreamEnd
+            campaignParams.unvestingStreamEnd,
+            campaignParams.rewardSupply
         );
     }
 
@@ -203,10 +158,10 @@ contract Hippodrome is IERC721Receiver {
     }
     
     function resolveCampaign(uint campaignID) public {
-        IHippodromeTypes.Campaign memory campaign = s_campaigns[campaignID];
+        Campaign memory campaign = s_campaigns[campaignID];
         _claimSynthetixRewards(campaignID);
-        uint poolSupply = ((campaign.allocatedSupply * campaign.rewardSupplyRate) / 100);
-        campaign.poolAddress = _createAerodromePool(campaign.tokenAddress, campaign.raised, poolSupply);
+
+        campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
     }
 
     function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) internal returns (address poolAddress){
@@ -226,8 +181,67 @@ contract Hippodrome is IERC721Receiver {
         );
     }
 
+    function _getUserContribution(uint128 campaignID, address user) internal view returns (uint256 userContribution) {
+        Launch storage launch = s_launches[campaignID];
+        UserStake storage userStake = launch.userStakes[user];
+        uint256 pastContribution = (block.timestamp - userStake.lastStakeTime) * userStake.amount;
+        userContribution = userStake.totalContribution + pastContribution;
+    }
 
-    
+    function _getTotalContribution(uint128 campaignID) internal view returns (uint256 totalContribution) {
+        Launch storage launch = s_launches[campaignID];
+        uint256 pastContribution = (block.timestamp - launch.lastUpdateTime) * launch.totalStaked;
+        totalContribution = launch.totalContribution + pastContribution;
+    }
+
+    function _updateAddContribution(address user, uint128 campaignID, uint256 amount) internal {
+        require(amount > 0, "Amount must be greater than zero");
+
+        Launch storage launch = s_launches[campaignID];
+        UserStake storage userStake = launch.userStakes[user];
+
+
+        uint256 timeElapsed = block.timestamp - launch.lastUpdateTime;
+        if (launch.totalStaked > 0) {
+            launch.totalContribution += timeElapsed * launch.totalStaked;
+        }
+        launch.lastUpdateTime = block.timestamp;
+
+
+        if (userStake.amount > 0) {
+            uint256 userTimeElapsed = block.timestamp - userStake.lastStakeTime;
+            userStake.totalContribution += userTimeElapsed * userStake.amount;
+        }
+
+
+        userStake.amount += amount;
+        userStake.lastStakeTime = block.timestamp;
+        launch.totalStaked += amount;
+
+        
+    }
+
+    function _updateWithdrawContribution(address user, uint128 campaignID, uint256 amount) internal {
+        Launch storage launch = s_launches[campaignID];
+        UserStake storage userStake = launch.userStakes[user];
+        require(userStake.amount >= amount, "Insufficient staked amount");
+
+
+        uint256 timeElapsed = block.timestamp - launch.lastUpdateTime;
+        if (launch.totalStaked > 0) {
+            launch.totalContribution += timeElapsed * launch.totalStaked;
+        }
+        launch.lastUpdateTime = block.timestamp;
+
+        uint256 userTimeElapsed = block.timestamp - userStake.lastStakeTime;
+        userStake.totalContribution += userTimeElapsed * userStake.amount;
+
+
+        userStake.amount -= amount;
+        userStake.lastStakeTime = block.timestamp;
+        launch.totalStaked -= amount;
+    }
+
     function onERC721Received(
         address operator,
         address from,
