@@ -23,6 +23,7 @@ interface IHippodrome is IHippodromeTypes{
     function claimRewards(uint128 campaignID) external virtual;
     function resolveCampaign(uint campaignID) external virtual;
 
-    function getUserRewards(address user, uint128 campaignID) external view virtual;
-    function calculateContributionPercentage(uint128 campaignId, address user) external view virtual;
+    function getAvailableUserRewards(address user, uint128 campaignID) external view virtual returns (uint);
+    function calculateContributionPercentage(uint128 campaignID, address user) external view virtual returns (uint);
+    function getUserRewardStatus(uint128 campaignID, address user) external view virtual returns(uint, uint);
 } 

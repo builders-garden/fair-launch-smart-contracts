@@ -72,7 +72,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         // stuff
     }
 
-    function claimRewards(uint128 campaignID) external {
+    function claimRewards(uint128 campaignID) external override {
         uint rewards = _getUserRewards(msg.sender, campaignID);
         require(rewards > s_claims[msg.sender][campaignID], "Hippodrome: claimed");
         Campaign memory campaign = s_campaigns[campaignID];
@@ -85,7 +85,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
     // either make it callable by anyone or automate
-    function resolveCampaign(uint campaignID) external {
+    function resolveCampaign(uint campaignID) external override{
         Campaign memory campaign = s_campaigns[campaignID];
         _claimSynthetixRewards(campaignID);
         campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
@@ -95,15 +95,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║             VIEW FUNCTIONS               ║
     //║══════════════════════════════════════════╝
 
-    function getAvailableUserRewards(address user, uint128 campaignID) external view returns(uint rewards) {
+    function getAvailableUserRewards(address user, uint128 campaignID) external view override returns(uint rewards) {
         _getUserRewards(user, campaignID);
     }
 
-    function calculateContributionPercentage(uint128 campaignID, address user) external view returns (uint256 percentage) {
+    function calculateContributionPercentage(uint128 campaignID, address user) external view override returns (uint256 percentage) {
         _calculateContributionPercentage(campaignID, user);
     }
 
-    function getUserRewardStatus(address user, uint128 campaignID) external view returns(uint totalRewards, uint claimed){
+    function getUserRewardStatus(uint128 campaignID, address user) external view override returns(uint totalRewards, uint claimed){
         uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
         Campaign memory campaign = s_campaigns[campaignID];
         totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
