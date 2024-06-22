@@ -24,15 +24,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     uint internal _campaignCounter;
     uint128 internal _poolID = 1;
     
-    mapping(uint=>Campaign) s_campaigns;
-    mapping(uint=>uint128) s_campaignAccounts;
-    mapping(address=>mapping(uint128=>uint256)) s_userStakes;
-    mapping(address=>mapping(uint128=>uint256)) s_contributions;
+    mapping(uint=>Campaign) public s_campaigns;
+    mapping(uint=>uint128) internal s_campaignAccounts;
+    mapping(address=>mapping(uint128=>uint256)) internal s_userStakes;
+    mapping(address=>mapping(uint128=>uint256)) internal s_contributions;
     mapping(uint256 => Launch) public s_launches;
     mapping(address => bool) internal s_tokens;
-    mapping(address=>mapping(uint128=>uint256)) s_claims;
-    mapping(address=>mapping(uint128=>uint256)) s_depositTimestamps;
-
+    mapping(address=>mapping(uint128=>uint256)) internal s_claims;
+    mapping(address=>mapping(uint128=>uint256)) internal s_depositTimestamps;
+    
     constructor
     (
         address _accountRouter,
@@ -77,7 +77,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         require(rewards > s_claims[msg.sender][campaignID], "Hippodrome: claimed");
         Campaign memory campaign = s_campaigns[campaignID];
       
-        // stream?
+        
         IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
         s_claims[msg.sender][campaignID] = rewards;
 
@@ -95,7 +95,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║             VIEW FUNCTIONS               ║
     //║══════════════════════════════════════════╝
 
-    function getUserRewards(address user, uint128 campaignID) external view returns(uint rewards) {
+    function getAvailableUserRewards(address user, uint128 campaignID) external view returns(uint rewards) {
         _getUserRewards(user, campaignID);
     }
 
@@ -103,6 +103,12 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         _calculateContributionPercentage(campaignID, user);
     }
 
+    function getUserRewardStatus(address user, uint128 campaignID) external view returns(uint totalRewards, uint claimed){
+        uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
+        Campaign memory campaign = s_campaigns[campaignID];
+        totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
+        claimed = s_claims[user][campaignID];
+    }
 
     //║══════════════════════════════════════════╗
     //║            INTERNAL FUNCTIONS            ║
@@ -118,7 +124,26 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     
     function _getUserRewards(address user, uint128 campaignID) internal view returns(uint rewards){
         uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
-        rewards = (uint(s_campaigns[campaignID].rewardSupply) * contributionPercentage ) / 100;
+        Campaign memory campaign = s_campaigns[campaignID];
+        uint streamStart = campaign.unvestStart;
+        uint streamEnd = campaign.unvestEnd;
+        uint currentTime = block.timestamp;
+
+      
+        if (currentTime < streamStart) {
+            return 0;
+        } else if (currentTime > streamEnd) {
+            currentTime = streamEnd;
+        }
+    
+        uint totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
+
+        uint elapsedTime = currentTime - streamStart;
+        uint streamDuration = streamEnd - streamStart;
+
+        uint claimedRewards = s_claims[user][campaignID];
+
+        rewards = ((totalRewards * elapsedTime) / streamDuration) - claimedRewards;
     }
 
 
@@ -260,8 +285,6 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         uint256 tokenId,
         bytes calldata data
     ) external override returns (bytes4) {
-        // Implement your logic here (e.g., logging, custom behavior, etc.)
-        
         // Return the selector to confirm the transfer
         return this.onERC721Received.selector;
     }
