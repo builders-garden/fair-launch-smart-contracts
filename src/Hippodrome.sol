@@ -55,27 +55,25 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║             USER FUNCTIONS               ║
     //║══════════════════════════════════════════╝
 
-    function createCampaign(CampaignParams memory campaignParams) public returns(uint128 accountID){
+    function createCampaign(CampaignParams memory campaignParams) external override returns(uint128 accountID){
         ++_campaignCounter;
         accountID = _createContractAndAccount(campaignParams);
-
-      
     }
     
-    function fundCampaign(uint128 campaignID, uint amount ) public {    
+    function fundCampaign(uint128 campaignID, uint amount ) external override{    
         s_userStakes[msg.sender][campaignID] += amount;   
         _depositAndDelegateOnAccount(campaignID, amount);
 
-        emit FundsAdded(msg.sender, campaignID);
+        emit FundsAdded(campaignID, msg.sender, amount);
     }
 
-    function withdrawFunds(uint128 campaignID) public{
+    function withdrawFunds(uint128 campaignID, uint amount) external override{
         require(s_depositTimestamps[msg.sender][campaignID] < 10 days, "Synthetix claim period isn't  over");
         // stuff
     }
 
-    function claimRewards(uint128 campaignID) public {
-        uint rewards = getUserRewards(msg.sender, campaignID);
+    function claimRewards(uint128 campaignID) external {
+        uint rewards = _getUserRewards(msg.sender, campaignID);
         require(rewards > s_claims[msg.sender][campaignID], "Hippodrome: claimed");
         Campaign memory campaign = s_campaigns[campaignID];
       
@@ -87,7 +85,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
     // either make it callable by anyone or automate
-    function resolveCampaign(uint campaignID) public {
+    function resolveCampaign(uint campaignID) external {
         Campaign memory campaign = s_campaigns[campaignID];
         _claimSynthetixRewards(campaignID);
         campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
@@ -97,17 +95,12 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║             VIEW FUNCTIONS               ║
     //║══════════════════════════════════════════╝
 
-    function getUserRewards(address user, uint128 campaignID) public view returns(uint rewards) {
-        uint contributionPercentage = calculateContributionPercentage(campaignID, user);
-        rewards = (uint(s_campaigns[campaignID].rewardSupply) * contributionPercentage ) / 100;
+    function getUserRewards(address user, uint128 campaignID) external view returns(uint rewards) {
+        _getUserRewards(user, campaignID);
     }
 
-    function calculateContributionPercentage(uint128 campaignID, address user) public view returns (uint256 percentage) {
-        uint256 userContribution = _getUserContribution(campaignID, user);
-        uint256 totalContribution = _getTotalContribution(campaignID);
-
-        require(totalContribution > 0, "Total contribution must be greater than zero");
-        percentage = (userContribution * 100000) / totalContribution;
+    function calculateContributionPercentage(uint128 campaignID, address user) external view returns (uint256 percentage) {
+        _calculateContributionPercentage(campaignID, user);
     }
 
 
@@ -115,8 +108,18 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║            INTERNAL FUNCTIONS            ║
     //║══════════════════════════════════════════╝
 
-  
+    function _calculateContributionPercentage(uint128 campaignID, address user) internal view returns (uint256 percentage){
+        uint256 userContribution = _getUserContribution(campaignID, user);
+        uint256 totalContribution = _getTotalContribution(campaignID);
+        
+        require(totalContribution > 0, "Total contribution must be greater than zero");
+        percentage = (userContribution * 100000) / totalContribution;
+    }
     
+    function _getUserRewards(address user, uint128 campaignID) internal view returns(uint rewards){
+        uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
+        rewards = (uint(s_campaigns[campaignID].rewardSupply) * contributionPercentage ) / 100;
+    }
 
 
     function _createContractAndAccount(CampaignParams memory campaignParams) internal returns(uint128 accountID){
@@ -142,7 +145,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
             campaignParams.unvestingStreamEnd,
             campaignParams.rewardSupply
         );
-        emit CampaignCreated(campaignID, msg.sender, s_campaigns[_campaignCounter]);
+        emit CampaignCreated(_campaignCounter, msg.sender, s_campaigns[_campaignCounter]);
     }
 
     function _depositAndDelegateOnAccount(uint campaignID, uint value) internal{

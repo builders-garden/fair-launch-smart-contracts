@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+
 import {IHippodromeTypes} from "./types/IHippodromeTypes.sol";
+
 interface IHippodrome is IHippodromeTypes{
     
     event CampaignCreated(uint indexed campaignID, address indexed founder, Campaign campaign);
@@ -15,6 +17,12 @@ interface IHippodrome is IHippodromeTypes{
     error RewardsClaimed();
     // other errors 
 
+    function createCampaign(CampaignParams memory campaignParams) external virtual returns(uint128 accountID);
+    function fundCampaign(uint128 campaignId, uint amount) external virtual;
+    function withdrawFunds(uint128 campaign, uint amount) external virtual;
+    function claimRewards(uint128 campaignID) external virtual;
+    function resolveCampaign(uint campaignID) external virtual;
 
-
+    function getUserRewards(address user, uint128 campaignID) external view virtual;
+    function calculateContributionPercentage(uint128 campaignId, address user) external view virtual;
 } 
