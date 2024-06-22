@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@aerodrome/interfaces/factories/IPoolFactory.sol";
 import "@aerodrome/interfaces/IPool.sol";
 import "@aerodrome/interfaces/IRouter.sol";
-
+    
 
 contract Hippodrome is IERC721Receiver, IHippodrome { 
 
@@ -58,11 +58,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     function createCampaign(CampaignParams memory campaignParams) public returns(uint128 accountID){
         ++_campaignCounter;
         accountID = _createContractAndAccount(campaignParams);
+
+      
     }
     
     function fundCampaign(uint128 campaignID, uint amount ) public {    
         s_userStakes[msg.sender][campaignID] += amount;   
         _depositAndDelegateOnAccount(campaignID, amount);
+
+        emit FundsAdded(msg.sender, campaignID);
     }
 
     function withdrawFunds(uint128 campaignID) public{
@@ -78,6 +82,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         // stream?
         IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
         s_claims[msg.sender][campaignID] = rewards;
+
+        emit RewardsClaimed(campaignID, msg.sender, rewards);
+    }
+
+    // either make it callable by anyone or automate
+    function resolveCampaign(uint campaignID) public {
+        Campaign memory campaign = s_campaigns[campaignID];
+        _claimSynthetixRewards(campaignID);
+        campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
     }
 
     //║══════════════════════════════════════════╗
@@ -129,6 +142,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
             campaignParams.unvestingStreamEnd,
             campaignParams.rewardSupply
         );
+        emit CampaignCreated(campaignID, msg.sender, s_campaigns[_campaignCounter]);
     }
 
     function _depositAndDelegateOnAccount(uint campaignID, uint value) internal{
@@ -157,12 +171,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         IRewardsManagerModule(accountRouter).claimRewards(accountID, _poolID, sUSDC, distributors[0]);
     }
     
-    function resolveCampaign(uint campaignID) public {
-        Campaign memory campaign = s_campaigns[campaignID];
-        _claimSynthetixRewards(campaignID);
-
-        campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
-    }
+  
 
     function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) internal returns (address poolAddress){
         poolAddress = IPoolFactory(aerodromePoolFactory).createPool(xToken, fUSDC, false);
