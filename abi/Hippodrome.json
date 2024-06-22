@@ -378,9 +378,9 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "uint128",
 				"name": "campaignID",
-				"type": "uint256"
+				"type": "uint128"
 			}
 		],
 		"name": "resolveCampaign",

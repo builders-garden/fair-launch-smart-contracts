@@ -32,7 +32,8 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     mapping(address => bool) internal s_tokens;
     mapping(address=>mapping(uint128=>uint256)) internal s_claims;
     mapping(address=>mapping(uint128=>uint256)) internal s_depositTimestamps;
-    
+    mapping(uint128=>bool) internal s_campaignResolved;
+
     constructor
     (
         address _accountRouter,
@@ -50,7 +51,6 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         aerodromeRouter = _aerodromeRouter;
     }
 
-    
     //║══════════════════════════════════════════╗
     //║             USER FUNCTIONS               ║
     //║══════════════════════════════════════════╝
@@ -63,13 +63,12 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     function fundCampaign(uint128 campaignID, uint amount ) external override{    
         s_userStakes[msg.sender][campaignID] += amount;   
         _depositAndDelegateOnAccount(campaignID, amount);
-
         emit FundsAdded(campaignID, msg.sender, amount);
     }
 
     function withdrawFunds(uint128 campaignID, uint amount) external override{
         require(s_depositTimestamps[msg.sender][campaignID] < 10 days, "Synthetix claim period isn't  over");
-        // stuff
+        _claimUserCollateral(campaignID, msg.sender, amount);
     }
 
     function claimRewards(uint128 campaignID) external override {
@@ -85,10 +84,11 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
     // either make it callable by anyone or automate
-    function resolveCampaign(uint campaignID) external override{
+    function resolveCampaign(uint128 campaignID) external override{
         Campaign memory campaign = s_campaigns[campaignID];
         _claimSynthetixRewards(campaignID);
         campaign.poolAddress = _createAerodromePoolAndAddLiquidity(campaign.tokenAddress, campaign.raised, campaign.poolSupply);
+        s_campaignResolved[campaignID] = true;
     }
 
     //║══════════════════════════════════════════╗
@@ -173,13 +173,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         emit CampaignCreated(_campaignCounter, msg.sender, s_campaigns[_campaignCounter]);
     }
 
-    function _depositAndDelegateOnAccount(uint campaignID, uint value) internal{
+    function _depositAndDelegateOnAccount(uint128 campaignID, uint value) internal{
         uint128 accountID = s_campaignAccounts[campaignID];
         IERC20(fUSDC).transferFrom(msg.sender, address(this), value);
         IERC20(fUSDC).approve(positionModule, value);
         _delegatePool(value);
         (uint totalDeposited, ,) = ICollateralModule(address(accountRouter)).getAccountCollateral(accountID, fUSDC);
         s_campaigns[campaignID].currentStake = uint56(totalDeposited);
+
+        _updateAddContribution(msg.sender, campaignID, value);
     }
 
     function _delegatePool(uint value) internal returns (bool success) {
@@ -192,14 +194,27 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         require(success, "Call failed");
     }
 
-    function _claimSynthetixRewards(uint campaignID) public returns(uint256[] memory claimableD18, address[] memory distributors) {
+    function _claimSynthetixRewards(uint campaignID) internal returns(uint256[] memory claimableD18, address[] memory distributors) {
+        // 10 days on synthetix before claim is available 
         uint128 accountID = s_campaignAccounts[campaignID];
+        Campaign memory campaign = s_campaigns[campaignID];
         (claimableD18, distributors) = IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
         s_campaigns[campaignID].raised += uint56(claimableD18[0]);
         IRewardsManagerModule(accountRouter).claimRewards(accountID, _poolID, sUSDC, distributors[0]);
+        ICollateralModule(positionModule).withdraw(accountID, fUSDC, campaign.currentStake);
+
     }
-    
-  
+
+    function _claimUserCollateral(uint128 campaignID, address user, uint amount) internal{
+        uint128 accountID = s_campaignAccounts[campaignID];
+        Campaign memory campaign = s_campaigns[campaignID];
+        uint userStake = s_userStakes[msg.sender][campaignID];
+        require(userStake >= amount, "");
+        ICollateralModule(positionModule).withdraw(accountID, fUSDC, amount);
+        IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
+        s_campaigns[campaignID].currentStake -= uint56(amount);
+        _updateWithdrawContribution(msg.sender, campaignID, amount);
+    }
 
     function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) internal returns (address poolAddress){
         poolAddress = IPoolFactory(aerodromePoolFactory).createPool(xToken, fUSDC, false);
@@ -254,8 +269,6 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         userStake.amount += amount;
         userStake.lastStakeTime = block.timestamp;
         launch.totalStaked += amount;
-
-        
     }
 
     function _updateWithdrawContribution(address user, uint128 campaignID, uint256 amount) internal {
