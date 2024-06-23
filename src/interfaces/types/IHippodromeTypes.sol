@@ -14,6 +14,7 @@ interface IHippodromeTypes {
         uint88  unvestStart;//═════════════════════════╗ 
         uint88  unvestEnd;//═══════════════════════════╝ 
         uint96  rewardSupply;
+        string  campaignURI; 
     }
 
     struct CampaignParams{

@@ -11,19 +11,19 @@ interface IHippodrome is IHippodromeTypes{
     event CampaignTerminated(uint campaignID, uint raised);
     event RewardsClaimed(uint indexed campaignID, address indexed user, uint amount);
     
-    error CampaignEnded();
-    error CampaignNotStarted();
+    error CampaignNotActive();
     error WithdrawLocked(uint256 unlockTime);
     error RewardsAlreadyClaimed();
+    error CampaignAlreadyExist();
     // other errors 
 
-    function createCampaign(CampaignParams memory campaignParams) external virtual returns(uint128 accountID);
-    function fundCampaign(uint128 campaignId, uint amount) external virtual;
-    function withdrawFunds(uint128 campaign, uint amount) external virtual;
-    function claimRewards(uint128 campaignID) external virtual;
-    function resolveCampaign(uint128 campaignID) external virtual;
+    function createCampaign(CampaignParams memory campaignParams) external  returns(uint128 accountID);
+    function fundCampaign(uint128 campaignId, uint amount) external ;
+    function withdrawFunds(uint128 campaign, uint amount) external ;
+    function claimRewards(uint128 campaignID) external ;
+    function resolveCampaign(uint128 campaignID) external ;
 
-    function getAvailableUserRewards(address user, uint128 campaignID) external view virtual returns (uint);
-    function calculateContributionPercentage(uint128 campaignID, address user) external view virtual returns (uint);
-    function getUserRewardStatus(uint128 campaignID, address user) external view virtual returns(uint, uint);
+    function getAvailableUserRewards(address user, uint128 campaignID) external view  returns (uint);
+    function calculateContributionPercentage(uint128 campaignID, address user) external view  returns (uint);
+    function getUserRewardStatus(uint128 campaignID, address user) external view  returns(uint, uint);
 } 

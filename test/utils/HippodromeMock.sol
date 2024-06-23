@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IHippodrome} from "./interfaces/IHippodrome.sol";
-import {IAccountModule} from "./interfaces/IAccount.sol";
-import {ICollateralModule} from "./interfaces/ICollateralModule.sol";
-import {IVaultModule} from "./interfaces/IVault.sol";
-import {IRewardsManagerModule} from "./interfaces/IRewardsManagerModule.sol";
+import {IHippodrome} from "../../src/interfaces/IHippodrome.sol";
+import {IAccountModule} from "../../src/interfaces/IAccount.sol";
+import {ICollateralModule} from "../../src/interfaces/ICollateralModule.sol";
+import {IVaultModule} from "../../src/interfaces/IVault.sol";
+import {IRewardsManagerModule} from "../../src/interfaces/IRewardsManagerModule.sol";
 import "@openzeppelin/contracts/Token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@aerodrome/interfaces/factories/IPoolFactory.sol";
@@ -13,30 +13,26 @@ import "@aerodrome/interfaces/IPool.sol";
 import "@aerodrome/interfaces/IRouter.sol";
     
 
-contract Hippodrome is IERC721Receiver, IHippodrome { 
+contract HippodromeMock is IERC721Receiver, IHippodrome { 
 
-    address internal fUSDC;
-    address internal accountRouter;
-    address internal positionModule;
-    address internal sUSDC;
-    address internal aerodromePoolFactory;
-    address internal aerodromeRouter;
-    uint internal _campaignCounter;
-    uint128 internal _poolID = 1;
+    address public fUSDC;
+    address public accountRouter;
+    address public positionModule;
+    address public sUSDC;
+    address public aerodromePoolFactory;
+    address public aerodromeRouter;
+    uint public _campaignCounter;
+    uint128 public _poolID = 1;
     
     mapping(uint=>Campaign) public s_campaigns;
-    mapping(uint=>uint128) internal s_campaignAccounts;
-    mapping(address=>mapping(uint128=>uint256)) internal s_userStakes;
-    mapping(address=>mapping(uint128=>uint256)) internal s_contributions;
+    mapping(uint=>uint128) public s_campaignAccounts;
+    mapping(address=>mapping(uint128=>uint256)) public s_userStakes;
+    mapping(address=>mapping(uint128=>uint256)) public s_contributions;
     mapping(uint256 => Launch) public s_launches;
-    mapping(address => bool) internal s_tokens;
-    mapping(address=>mapping(uint128=>uint256)) internal s_claims;
-    mapping(address=>mapping(uint128=>uint256)) internal s_depositTimestamps;
-    mapping(uint128=>bool) internal s_campaignResolved;
-    
-    //║══════════════════════════════════════════╗
-    //║              Modifiers                   ║
-    //║══════════════════════════════════════════╝
+    mapping(address => bool) public s_tokens;
+    mapping(address=>mapping(uint128=>uint256)) public s_claims;
+    mapping(address=>mapping(uint128=>uint256)) public s_depositTimestamps;
+    mapping(uint128=>bool) public s_campaignResolved;
     
     modifier onlyActiveCampaign(uint128 campaignID) {
     if (!(
@@ -126,10 +122,10 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
     //║══════════════════════════════════════════╗
-    //║            INTERNAL FUNCTIONS            ║
+    //║            public FUNCTIONS            ║
     //║══════════════════════════════════════════╝
 
-    function _calculateContributionPercentage(uint128 campaignID, address user) internal view returns (uint256 percentage){
+    function _calculateContributionPercentage(uint128 campaignID, address user) public view returns (uint256 percentage){
         uint256 userContribution = _getUserContribution(campaignID, user);
         uint256 totalContribution = _getTotalContribution(campaignID);
         
@@ -137,7 +133,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         percentage = (userContribution * 100000) / totalContribution;
     }
     
-    function _getUserRewards(address user, uint128 campaignID) internal view returns(uint rewards){
+    function _getUserRewards(address user, uint128 campaignID) public view returns(uint rewards){
         uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
         Campaign memory campaign = s_campaigns[campaignID];
         uint streamStart = campaign.unvestStart;
@@ -162,7 +158,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
 
-    function _createContractAndAccount(CampaignParams memory campaignParams) internal returns(uint128 accountID){
+    function _createContractAndAccount(CampaignParams memory campaignParams) public returns(uint128 accountID){
         // get tokens from founder
         address campaignToken = campaignParams.tokenAddress;
         uint allocatedSupply = campaignParams.poolSupply + campaignParams.rewardSupply;
@@ -184,14 +180,15 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
             campaignParams.endTimestamp,
             campaignParams.unvestingStreamStart, 
             campaignParams.unvestingStreamEnd,
-            campaignParams.rewardSupply, 
+            campaignParams.rewardSupply,
             campaignParams.campaignURI
         );
+        
         s_tokens[campaignParams.tokenAddress] = true;
         emit CampaignCreated(_campaignCounter, msg.sender, s_campaigns[_campaignCounter]);
     }
 
-    function _depositAndDelegateOnAccount(uint128 campaignID, uint value) internal{
+    function _depositAndDelegateOnAccount(uint128 campaignID, uint value) public{
         uint128 accountID = s_campaignAccounts[campaignID];
         IERC20(fUSDC).transferFrom(msg.sender, address(this), value);
         IERC20(fUSDC).approve(positionModule, value);
@@ -202,7 +199,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         _updateAddContribution(msg.sender, campaignID, value);
     }
 
-    function _delegatePool(uint value) internal returns (bool success) {
+    function _delegatePool(uint value) public returns (bool success) {
         (success, ) = address(positionModule).call(
             abi.encodePacked(
                 hex"d7ce770c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000a7d8c0",
@@ -212,7 +209,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         require(success, "Call failed");
     }
 
-    function _claimSynthetixRewards(uint campaignID) internal returns(uint256[] memory claimableD18, address[] memory distributors) {
+    function _claimSynthetixRewards(uint campaignID) public returns(uint256[] memory claimableD18, address[] memory distributors) {
         // 10 days on synthetix before claim is available 
         uint128 accountID = s_campaignAccounts[campaignID];
         Campaign memory campaign = s_campaigns[campaignID];
@@ -223,7 +220,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
 
     }
 
-    function _claimUserCollateral(uint128 campaignID, address user, uint amount) internal{
+    function _claimUserCollateral(uint128 campaignID, address user, uint amount) public{
         uint128 accountID = s_campaignAccounts[campaignID];
         Campaign memory campaign = s_campaigns[campaignID];
         uint userStake = s_userStakes[msg.sender][campaignID];
@@ -234,7 +231,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         _updateWithdrawContribution(msg.sender, campaignID, amount);
     }
 
-    function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) internal returns (address poolAddress){
+    function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) public returns (address poolAddress){
         poolAddress = IPoolFactory(aerodromePoolFactory).createPool(xToken, fUSDC, false);
         IERC20(xToken).approve(aerodromeRouter, poolSupply);
         IERC20(fUSDC).approve(aerodromeRouter, amountRaised);
@@ -251,20 +248,20 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         );
     }
 
-    function _getUserContribution(uint128 campaignID, address user) internal view returns (uint256 userContribution) {
+    function _getUserContribution(uint128 campaignID, address user) public view returns (uint256 userContribution) {
         Launch storage launch = s_launches[campaignID];
         UserStake storage userStake = launch.userStakes[user];
         uint256 pastContribution = (block.timestamp - userStake.lastStakeTime) * userStake.amount;
         userContribution = userStake.totalContribution + pastContribution;
     }
 
-    function _getTotalContribution(uint128 campaignID) internal view returns (uint256 totalContribution) {
+    function _getTotalContribution(uint128 campaignID) public view returns (uint256 totalContribution) {
         Launch storage launch = s_launches[campaignID];
         uint256 pastContribution = (block.timestamp - launch.lastUpdateTime) * launch.totalStaked;
         totalContribution = launch.totalContribution + pastContribution;
     }
 
-    function _updateAddContribution(address user, uint128 campaignID, uint256 amount) internal {
+    function _updateAddContribution(address user, uint128 campaignID, uint256 amount) public {
         require(amount > 0, "Amount must be greater than zero");
 
         Launch storage launch = s_launches[campaignID];
@@ -289,7 +286,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         launch.totalStaked += amount;
     }
 
-    function _updateWithdrawContribution(address user, uint128 campaignID, uint256 amount) internal {
+    function _updateWithdrawContribution(address user, uint128 campaignID, uint256 amount) public {
         Launch storage launch = s_launches[campaignID];
         UserStake storage userStake = launch.userStakes[user];
         require(userStake.amount >= amount, "Insufficient staked amount");
