@@ -14,7 +14,6 @@ contract HippodromeTest is Test, IERC721Receiver {
     address fUSDC = 0xc43708f8987Df3f3681801e5e640667D86Ce3C30;
     address accountRouter = 0x764F4C95FDA0D6f8114faC54f6709b1B45f919a1;
     address wrapProxy = 0xaD2fE7cd224c58871f541DAE01202F93928FEF72;
-    address collateralModule = 0x30BC8AFcbb9FA715f921Ef9cE37B2023084AF219;
     address sUSDC = 0x8069c44244e72443722cfb22DcE5492cba239d39;
     address aerodromePoolFactory = 0x9F631b6E37045E0C66ed2d6AE28eEb53A5bda82D;
     address aerodromeRouter = 0x70bD534579cbaBbE9Cd4AD4210e29CC9BA1E9287;
@@ -25,7 +24,7 @@ contract HippodromeTest is Test, IERC721Receiver {
         hd = new HippodromeMock(
             accountRouter,
             fUSDC,
-            collateralModule,
+            wrapProxy,
             sUSDC,
             aerodromePoolFactory,
             aerodromeRouter

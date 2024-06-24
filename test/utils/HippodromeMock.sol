@@ -6,6 +6,8 @@ import {IAccountModule} from "../../src/interfaces/IAccount.sol";
 import {ICollateralModule} from "../../src/interfaces/ICollateralModule.sol";
 import {IVaultModule} from "../../src/interfaces/IVault.sol";
 import {IRewardsManagerModule} from "../../src/interfaces/IRewardsManagerModule.sol";
+import {IWrapperModule} from "../../src/interfaces/IWrapperModule.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/Token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@aerodrome/interfaces/factories/IPoolFactory.sol";
@@ -15,7 +17,7 @@ import "@aerodrome/interfaces/IRouter.sol";
 contract HippodromeMock is IERC721Receiver, IHippodrome {
     address public fUSDC;
     address public accountRouter;
-    address public collateralModule;
+    address public wrapProxy;
     address public sUSDC;
     address public aerodromePoolFactory;
     address public aerodromeRouter;
@@ -46,14 +48,14 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     constructor(
         address _accountRouter,
         address _fUSDC,
-        address _collateralModule,
+        address _wrapModule,
         address _sUSDC,
         address _aerodromePoolFactory,
         address _aerodromeRouter
     ) {
         accountRouter = _accountRouter;
         fUSDC = _fUSDC;
-        collateralModule = _collateralModule;
+        wrapProxy = _wrapModule;
         sUSDC = _sUSDC;
         aerodromePoolFactory = _aerodromePoolFactory;
         aerodromeRouter = _aerodromeRouter;
@@ -250,8 +252,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     ) public {
         uint128 accountID = s_campaignAccounts[campaignID];
         IERC20(fUSDC).transferFrom(msg.sender, address(this), amount);
-        IERC20(fUSDC).approve(collateralModule, amount);
-        ICollateralModule(collateralModule).deposit(accountID, fUSDC, amount);
+        IERC20(fUSDC).approve(wrapProxy, amount);
+        ICollateralModule(accountRouter).deposit(accountID, fUSDC, amount);
 
         s_campaigns[campaignID].currentStake += uint56(amount);
 
@@ -259,7 +261,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     }
 
     function _delegatePool(uint amount) public returns (bool success) {
-        (success, ) = address(collateralModule).call(
+        (success, ) = address(wrapProxy).call(
             abi.encodePacked(
                 hex"d7ce770c0000000000000000000000000000000000000000000000000000000000000001",
                 abi.encode(amount),
@@ -272,8 +274,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function _withdrawFundsFromAccount(
         uint amount
     ) public returns (bool success) {
-        IERC20(sUSDC).approve(collateralModule, amount);
-        (success, ) = address(collateralModule).call(
+        IERC20(sUSDC).approve(wrapProxy, amount);
+        (success, ) = address(wrapProxy).call(
             abi.encodePacked(
                 hex"784dad9e0000000000000000000000000000000000000000000000000000000000000001",
                 abi.encode(amount), // amount
