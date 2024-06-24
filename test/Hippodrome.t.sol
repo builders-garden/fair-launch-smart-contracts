@@ -105,16 +105,16 @@ contract HippodromeTest is Test {
         deal(fUSDC, address(hd), 1e8);
         IERC20(fUSDC).approve(address(hd), 1e30);
         createCampaign();
-        
-        IERC20(fUSDC).approve(address(hd), 1e8);
+        console.log(IERC20(sUSDC).balanceOf(address(hd)));
+        console.log(IERC20(fUSDC).balanceOf(address(hd)));
         hd.fundCampaign(1, 1e8);
+        IERC20(sUSDC).approve(address(hd), 1e30);
+        console.log(IERC20(fUSDC).balanceOf(address(hd)));
         // assert user balance = 0 after funding
-
-
         (uint256[] memory claimableD18, address[] memory distributors) =  hd._claimSynthetixRewards(1);
 
+        console.log(IERC20(fUSDC).balanceOf(address(hd)));
         hd.resolveCampaign(1);
-        
     }
     
 

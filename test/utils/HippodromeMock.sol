@@ -23,7 +23,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     address public aerodromeRouter;
     uint public _campaignCounter;
     uint128 public _poolID = 1;
-    
+    uint constant contributionPrecision = 1e5;
+
+
     mapping(uint=>Campaign) public s_campaigns;
     mapping(uint=>uint128) public s_campaignAccounts;
     mapping(address=>mapping(uint128=>uint256)) public s_userStakes;
@@ -117,7 +119,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function getUserRewardStatus(uint128 campaignID, address user) external view override returns(uint totalRewards, uint claimed){
         uint contributionPercentage = _calculateContributionPercentage(campaignID, user);
         Campaign memory campaign = s_campaigns[campaignID];
-        totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
+        totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / contributionPrecision;
         claimed = s_claims[user][campaignID];
     }
 
@@ -130,7 +132,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint256 totalContribution = _getTotalContribution(campaignID);
         
         require(totalContribution > 0, "Total contribution must be greater than zero");
-        percentage = (userContribution * 100000) / totalContribution;
+        percentage = (userContribution * contributionPrecision) / totalContribution;
     }
     
     function _getUserRewards(address user, uint128 campaignID) public view returns(uint rewards){
@@ -147,9 +149,11 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             currentTime = streamEnd;
         }
     
-        uint totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
+        uint totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / contributionPrecision;
+
         uint elapsedTime = currentTime - streamStart;
         uint streamDuration = streamEnd - streamStart;
+
         uint claimedRewards = s_claims[user][campaignID];
 
         rewards = ((totalRewards * elapsedTime) / streamDuration) - claimedRewards;
