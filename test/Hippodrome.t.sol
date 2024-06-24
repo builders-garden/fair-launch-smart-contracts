@@ -20,6 +20,7 @@ contract HippodromeTest is Test, IERC721Receiver {
 
     HippodromeMock hd;
     XToken xToken;
+    uint128 public accountID;
     function setUp() public {
         hd = new HippodromeMock(
             accountRouter,
@@ -32,102 +33,113 @@ contract HippodromeTest is Test, IERC721Receiver {
         xToken = new XToken("xToken", "xT");
     }
 
-    function test_SV3_Deposit() public {
-        uint128 accountID = IAccountModule(accountRouter).createAccount();
+    modifier campaignCreated() {
+        uint96 poolSupply = 100e6;
+        // approve Hippodrome
+        IERC20(xToken).approve(address(hd), 110e6);
+        // create campaignParams
+        IHippodromeTypes.CampaignParams memory campaignParams = IHippodromeTypes
+            .CampaignParams(
+                poolSupply,
+                uint88(block.timestamp), // now
+                uint88(block.timestamp + 30 days), // end
+                uint88(block.timestamp + 30 days), // vest start
+                uint88(block.timestamp + 60 days), // vest end
+                poolSupply / 10, // 10% of pool supply
+                address(xToken),
+                "data"
+            );
+        // create campaign
+        accountID = hd.createCampaign(campaignParams);
+        _;
+    }
 
-        deal(fUSDC, address(this), 1e6);
-        IERC20(fUSDC).approve(wrapProxy, 1e6);
+    // to run it: forge test --fork-url https://sepolia.base.org -vvv --mt test_SV3_DepositAndWithdraw
+    function test_SV3_DepositAndWithdraw() public campaignCreated {
+        uint256 initialDeposit = 1e6;
+        uint256 initialStake = hd.s_userStakes(address(this),1);
+        assertEq(initialStake, 0);
 
-        IWrapperModule(wrapProxy).wrap(1, 1e6, 0);
-        IERC20(sUSDC).approve(accountRouter, 1e18);
-        ICollateralModule(accountRouter).deposit(accountID, sUSDC, 1e18);
 
-        ICollateralModule(accountRouter).withdraw(accountID, sUSDC, 1e18);
-        IWrapperModule(wrapProxy).unwrap(1, 1e18, 0);
-        console.logUint(IERC20(fUSDC).balanceOf(address(this)));
+        deal(fUSDC, address(this), initialDeposit);
+        IERC20(fUSDC).approve(address(hd), initialDeposit);
+        hd.fundCampaign(1, initialDeposit);
+        uint256 stakeAfterDeposit = hd.s_userStakes(address(this),1);
+        assertEq(stakeAfterDeposit, initialDeposit);
+        hd.withdrawFunds(1, initialDeposit);
+        uint256 stakeAfterWithdraw = hd.s_userStakes(address(this),1);
+        assertEq(stakeAfterWithdraw, 0);
     }
 
 
-    // function test_CreateCamapign() public {
-    //     uint96 poolSupply = 100e6;
-    //     // approve Hippodrome
-    //     IERC20(xToken).approve(address(hd), 110e6);
-    //     // create campaignParams
-    //     IHippodromeTypes.CampaignParams memory campaignParams = IHippodromeTypes
-    //         .CampaignParams(
-    //             poolSupply,
-    //             uint88(block.timestamp), // now
-    //             uint88(block.timestamp + 30 days), // end
-    //             uint88(block.timestamp + 30 days), // vest start
-    //             uint88(block.timestamp + 60 days), // vest end
-    //             poolSupply / 10, // 10% of pool supply
-    //             address(xToken),
-    //             "data"
-    //         );
-    //     // create campaign
-    //     uint128 accountID = hd.createCampaign(campaignParams);
-    //     // assert counter increases accordigly
-    //     assertTrue(hd._campaignCounter() == 1);
-    //     // assert accountID is coupled with campaignID
-    //     assertTrue(hd.s_campaignAccounts(1) == accountID);
 
-    //     // expect revert on creating campaign on same token
-    //     vm.expectRevert(bytes4(keccak256("CampaignAlreadyExist()")));
-    //     hd.createCampaign(campaignParams);
-    // }
+    function test_CreateCamapign() public {
+         uint96 poolSupply = 100e6;
+        // approve Hippodrome
+        IERC20(xToken).approve(address(hd), 110e6);
+        // create campaignParams
+        IHippodromeTypes.CampaignParams memory campaignParams = IHippodromeTypes
+            .CampaignParams(
+                poolSupply,
+                uint88(block.timestamp), // now
+                uint88(block.timestamp + 30 days), // end
+                uint88(block.timestamp + 30 days), // vest start
+                uint88(block.timestamp + 60 days), // vest end
+                poolSupply / 10, // 10% of pool supply
+                address(xToken),
+                "data"
+            );
+        // create campaign
+        accountID = hd.createCampaign(campaignParams);
+        // assert counter increases accordigly
+        assertTrue(hd._campaignCounter() == 1);
+        // assert accountID is coupled with campaignID
+        assertTrue(hd.s_campaignAccounts(1) == accountID);
 
-    // function test_fundCampaign() public {
-    //     // self deal fUSDC to add liquidity
-    //     deal(fUSDC, address(this), 1e8);
+        // expect revert on creating campaign on same token
+        vm.expectRevert(bytes4(keccak256("CampaignAlreadyExist()")));
+        hd.createCampaign(campaignParams);
+    }
 
-    //     // approve Hippodrome
-    //     IERC20(fUSDC).approve(address(hd), 1e8);
-    //     // expect revert if the campaign dosent exists due to onlyActiveCampaign() modifier
-    //     vm.expectRevert();
-    //     hd.fundCampaign(1, 1e8);
-    //     // create campaign id 1
-    //     createCampaign();
-    //     // fund campaign
-    //     hd.fundCampaign(1, 1e8);
-    //     // assert user balance = 0 after funding
-    //     assertTrue(IERC20(fUSDC).balanceOf(address(this)) == 0);
-    // }
+    function test_fundCampaign() public campaignCreated {
+        // self deal fUSDC to add liquidity
+        deal(fUSDC, address(this), 1e8);
 
-    // function test_withdrawFunds() public {
-    //     // Create & Fund Campaig
-    //     deal(fUSDC, address(this), 1e8);
-    //     IERC20(fUSDC).approve(address(hd), 1e8);
-    //     createCampaign();
-    //     hd.fundCampaign(1, 1e8);
+        // approve Hippodrome
+        IERC20(fUSDC).approve(address(hd), 1e8);
+        // expect revert if the campaign dosent exists due to onlyActiveCampaign() modifier
+        vm.expectRevert();
+        hd.fundCampaign(10, 1e8);
+        // create campaign id 1
+        // fund campaign
+        hd.fundCampaign(1, 1e8);
+        // assert user balance = 0 after funding
+        assertTrue(IERC20(fUSDC).balanceOf(address(this)) == 0);
+    }
 
-    //     // withdraw funds
-    //     // expect revert due to Synthetix 10 days lock
-    //     vm.expectRevert();
-    //     hd.withdrawFunds(1, 1e8);
+    function test_withdrawFunds() public campaignCreated {
+        // withdraw funds
+        vm.expectRevert();
+        hd.withdrawFunds(10, 1e8);
 
-    //     // warp ahead
-    //     vm.warp(block.timestamp + 10 days + 1 seconds);
-    //     hd.withdrawFunds(1, 1e8);
+    }
 
-    // }
-
-    // function test_resolveCampaign() public {
-    //     deal(fUSDC, address(this), 1e8);
-    //     deal(fUSDC, address(hd), 1e8);
-    //     IERC20(fUSDC).approve(address(hd), 1e30);
-    //     createCampaign();
-    //     hd.fundCampaign(1, 1e8);
-    //     IERC20(sUSDC).approve(address(hd), 1e30);
-    //     // assert user balance = 0 after funding
-    //     (uint256[] memory claimableD18, address[] memory distributors) = hd
-    //         ._claimSynthetixRewards(1);
-    //     hd.resolveCampaign(1);
-    // }
+    function test_resolveCampaign() public campaignCreated {
+        deal(fUSDC, address(this), 1e8);
+        deal(fUSDC, address(hd), 1e8);
+        IERC20(fUSDC).approve(address(hd), 1e30);
+        // createCampaign();
+        hd.fundCampaign(1, 1e8);
+        IERC20(sUSDC).approve(address(hd), 1e30);
+        // assert user balance = 0 after funding
+        (uint256[] memory claimableD18, address[] memory distributors) = hd
+            ._claimSynthetixRewards(1);
+        hd.resolveCampaign(1);
+    }
 
     //║══════════════════════════════════════════╗
     //║            Utility FUNCTIONS             ║
     //║══════════════════════════════════════════╝
-
     function createCampaign() internal returns (uint128 accountID) {
         uint96 poolSupply = 100e6;
         // approve Hippodrome
@@ -147,6 +159,7 @@ contract HippodromeTest is Test, IERC721Receiver {
         // create campaign
         accountID = hd.createCampaign(campaignParams);
     }
+
     function onERC721Received(
         address operator,
         address from,

@@ -91,6 +91,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             s_depositTimestamps[msg.sender][campaignID] < 10 days,
             "Synthetix claim period isn't  over"
         );
+        s_userStakes[msg.sender][campaignID] -= amount;
         _claimUserCollateral(campaignID, msg.sender, amount);
     }
 
@@ -251,39 +252,23 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint amount
     ) public {
         uint128 accountID = s_campaignAccounts[campaignID];
-        IERC20(fUSDC).transferFrom(msg.sender, address(this), amount);
-        IERC20(fUSDC).approve(wrapProxy, amount);
-        ICollateralModule(accountRouter).deposit(accountID, fUSDC, amount);
+        address memoryFUsdc = fUSDC;
+        address memorySUsdc = sUSDC;
+        IERC20(memoryFUsdc).transferFrom(msg.sender, address(this), amount);
+
+        // wrap
+        IERC20(memoryFUsdc).approve(wrapProxy, amount);
+        IWrapperModule(wrapProxy).wrap(1, amount, 0);
+        
+        // deposit
+        IERC20(memorySUsdc).approve(accountRouter, 1e18);
+        ICollateralModule(accountRouter).deposit(accountID, memorySUsdc, amount);
 
         s_campaigns[campaignID].currentStake += uint56(amount);
 
         _updateAddContribution(msg.sender, campaignID, amount);
     }
 
-    function _delegatePool(uint amount) public returns (bool success) {
-        (success, ) = address(wrapProxy).call(
-            abi.encodePacked(
-                hex"d7ce770c0000000000000000000000000000000000000000000000000000000000000001",
-                abi.encode(amount),
-                abi.encode(amount)
-            )
-        );
-        require(success, "Call failed");
-    }
-
-    function _withdrawFundsFromAccount(
-        uint amount
-    ) public returns (bool success) {
-        IERC20(sUSDC).approve(wrapProxy, amount);
-        (success, ) = address(wrapProxy).call(
-            abi.encodePacked(
-                hex"784dad9e0000000000000000000000000000000000000000000000000000000000000001",
-                abi.encode(amount), // amount
-                abi.encode(0) // naive min amount
-            )
-        );
-        require(success, "Call failed");
-    }
 
     function _claimSynthetixRewards(
         uint campaignID
@@ -303,7 +288,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             sUSDC,
             distributors[0]
         );
-        _withdrawFundsFromAccount(campaign.currentStake);
+        // _withdrawFundsFromAccount(campaign.currentStake);
     }
 
     function _claimUserCollateral(
@@ -315,7 +300,6 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         Campaign memory campaign = s_campaigns[campaignID];
         uint userStake = s_userStakes[msg.sender][campaignID];
         require(userStake >= amount, "");
-        _withdrawFundsFromAccount(amount);
         IRewardsManagerModule(accountRouter).updateRewards(
             _poolID,
             sUSDC,
@@ -323,6 +307,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         );
         s_campaigns[campaignID].currentStake -= uint56(amount);
         _updateWithdrawContribution(msg.sender, campaignID, amount);
+
+        ICollateralModule(accountRouter).withdraw(accountID, sUSDC, amount);
+        IWrapperModule(wrapProxy).unwrap(1, 1e18, 0);
     }
 
     function _createAerodromePoolAndAddLiquidity(
