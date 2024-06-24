@@ -66,6 +66,7 @@ contract HippodromeTest is Test {
     function test_fundCampaign() public {
         // self deal fUSDC to add liquidity
         deal(fUSDC, address(this), 1e8);
+        
         // approve Hippodrome
         IERC20(fUSDC).approve(address(hd), 1e8);
         // expect revert if the campaign dosent exists due to onlyActiveCampaign() modifier
@@ -81,38 +82,40 @@ contract HippodromeTest is Test {
         );
     }
 
+    // function test_withdrawFunds() public {
+    //     // Create & Fund Campaig
+    //     deal(fUSDC, address(this), 1e8);
+    //     IERC20(fUSDC).approve(address(hd), 1e8);
+    //     createCampaign();
+    //     hd.fundCampaign(1, 1e8);
 
-    // function test_FundCampign() public {
-    //     deal(fusdc,address(this), 1e30);
-    //     IERC20(fusdc).approve(address(hd), 1e30);
-    //     console.logUint(IERC20(fusdc).balanceOf(address(hd)));
-    //     uint96 amount = 100e6;
-    //     IHippodromeTypes.CampaignParams memory campaignParams = IHippodromeTypes.CampaignParams(
-    //         amount, uint88(block.timestamp), uint88(block.timestamp + 1 days),  uint88(block.timestamp + 1 days), uint88(block.timestamp + 1 days), 2, "viva", "il", "duce" 
-    //     );
-    //     uint128 accountID = hd.createCampaign(campaignParams);
+    //     // withdraw funds
+    //     // expect revert due to Synthetix 10 days lock
+    //     vm.expectRevert();
+    //     hd.withdrawFunds(1, 1e8);
 
-    //     hd.fundCampaign(1, amount);
-    //     (uint256[] memory claimableD18, address[] memory distributors) =  hd._claimSynthetixRewards(1);
+    //     // warp ahead
+    //     vm.warp(block.timestamp + 10 days + 1 seconds);
+    //     hd.withdrawFunds(1, 1e8);
+
     // }
-
-    // function test_resolveCampaign() public {
-    //     deal(fusdc,address(this), 1e30);
-      
-    //     IERC20(fusdc).approve(address(hd), 1e30);
+    
+    function test_resolveCampaign() public {
+        deal(fUSDC,address(this), 1e8);
+        deal(fUSDC, address(hd), 1e8);
+        IERC20(fUSDC).approve(address(hd), 1e30);
+        createCampaign();
         
-    //     uint96 amount = 100e6;
-    //     IHippodromeTypes.CampaignParams memory campaignParams = IHippodromeTypes.CampaignParams(
-    //         amount, uint88(block.timestamp), uint88(block.timestamp + 1 days),  uint88(block.timestamp + 1 days), uint88(block.timestamp + 1 days), 2, "viva", "il", "duce" 
-    //     );
-    //     uint128 accountID = hd.createCampaign(campaignParams);
+        IERC20(fUSDC).approve(address(hd), 1e8);
+        hd.fundCampaign(1, 1e8);
+        // assert user balance = 0 after funding
 
-    //     hd.fundCampaign(1, amount);
-    //     (uint256[] memory claimableD18, address[] memory distributors) =  hd._claimSynthetixRewards(1);
 
-    //     hd.resolveCampaign(1);
+        (uint256[] memory claimableD18, address[] memory distributors) =  hd._claimSynthetixRewards(1);
+
+        hd.resolveCampaign(1);
         
-    // }
+    }
     
 
 
@@ -121,7 +124,7 @@ contract HippodromeTest is Test {
     //║            Utility FUNCTIONS             ║
     //║══════════════════════════════════════════╝
 
-        function createCampaign() internal {
+        function createCampaign() internal returns (uint128 accountID){
         uint96 poolSupply = 100e6;
         // approve Hippodrome 
         IERC20(xToken).approve(address(hd), 110e6);
@@ -137,6 +140,6 @@ contract HippodromeTest is Test {
             "data"
         );
         // create campaign
-        uint128 accountID = hd.createCampaign(campaignParams);
+        accountID = hd.createCampaign(campaignParams);
     }
 }

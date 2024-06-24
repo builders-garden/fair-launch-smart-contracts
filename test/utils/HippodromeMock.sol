@@ -35,14 +35,14 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     mapping(uint128=>bool) public s_campaignResolved;
     
     modifier onlyActiveCampaign(uint128 campaignID) {
-    if (!(
-        block.timestamp >= s_campaigns[campaignID].startTimestamp && 
-        block.timestamp <= s_campaigns[campaignID].endTimestamp
-    )) {
-        revert CampaignNotActive();
+        if (!(
+            block.timestamp >= s_campaigns[campaignID].startTimestamp && 
+            block.timestamp <= s_campaigns[campaignID].endTimestamp
+        )) {
+            revert CampaignNotActive();
+        }
+        _;
     }
-    _;
-}
 
     constructor
     (
@@ -102,9 +102,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         s_campaignResolved[campaignID] = true;
     }
 
-    //║══════════════════════════════════════════╗
-    //║             VIEW FUNCTIONS               ║
-    //║══════════════════════════════════════════╝
+    //║═════════════════════════════════════════╗
+    //║             VIEW FUNCTIONS              ║
+    //║═════════════════════════════════════════╝
 
     function getAvailableUserRewards(address user, uint128 campaignID) external view override returns(uint rewards) {
         _getUserRewards(user, campaignID);
@@ -121,9 +121,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         claimed = s_claims[user][campaignID];
     }
 
-    //║══════════════════════════════════════════╗
-    //║            public FUNCTIONS            ║
-    //║══════════════════════════════════════════╝
+    //║═════════════════════════════════════════╗
+    //║            public FUNCTIONS             ║
+    //║═════════════════════════════════════════╝
 
     function _calculateContributionPercentage(uint128 campaignID, address user) public view returns (uint256 percentage){
         uint256 userContribution = _getUserContribution(campaignID, user);
@@ -148,10 +148,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         }
     
         uint totalRewards = (uint(campaign.rewardSupply) * contributionPercentage) / 100;
-
         uint elapsedTime = currentTime - streamStart;
         uint streamDuration = streamEnd - streamStart;
-
         uint claimedRewards = s_claims[user][campaignID];
 
         rewards = ((totalRewards * elapsedTime) / streamDuration) - claimedRewards;
@@ -193,8 +191,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         IERC20(fUSDC).transferFrom(msg.sender, address(this), value);
         IERC20(fUSDC).approve(positionModule, value);
         _delegatePool(value);
-        (uint totalDeposited, ,) = ICollateralModule(address(accountRouter)).getAccountCollateral(accountID, fUSDC);
-        s_campaigns[campaignID].currentStake = uint56(totalDeposited);
+
+        s_campaigns[campaignID].currentStake += uint56(value);
 
         _updateAddContribution(msg.sender, campaignID, value);
     }
@@ -202,8 +200,21 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function _delegatePool(uint value) public returns (bool success) {
         (success, ) = address(positionModule).call(
             abi.encodePacked(
-                hex"d7ce770c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000a7d8c0",
+                hex"d7ce770c0000000000000000000000000000000000000000000000000000000000000001",
+                abi.encode(value),
                 abi.encode(value)
+                )
+            );
+        require(success, "Call failed");
+    }
+
+    function _withdrawFundsFromAccount(uint value) public returns (bool success) {
+        IERC20(sUSDC).approve(positionModule, value);
+        (success, ) = address(positionModule).call(
+            abi.encodePacked(
+                hex"784dad9e0000000000000000000000000000000000000000000000000000000000000001",
+                abi.encode(value), // amount
+                abi.encode(0) // naive min amount 
                 )
             );
         require(success, "Call failed");
@@ -216,8 +227,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         (claimableD18, distributors) = IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
         s_campaigns[campaignID].raised += uint56(claimableD18[0]);
         IRewardsManagerModule(accountRouter).claimRewards(accountID, _poolID, sUSDC, distributors[0]);
-        ICollateralModule(positionModule).withdraw(accountID, fUSDC, campaign.currentStake);
-
+        _withdrawFundsFromAccount(campaign.currentStake);
     }
 
     function _claimUserCollateral(uint128 campaignID, address user, uint amount) public{
@@ -225,7 +235,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         Campaign memory campaign = s_campaigns[campaignID];
         uint userStake = s_userStakes[msg.sender][campaignID];
         require(userStake >= amount, "");
-        ICollateralModule(positionModule).withdraw(accountID, fUSDC, amount);
+        _withdrawFundsFromAccount(amount);
         IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
         s_campaigns[campaignID].currentStake -= uint56(amount);
         _updateWithdrawContribution(msg.sender, campaignID, amount);
@@ -234,13 +244,13 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function _createAerodromePoolAndAddLiquidity(address xToken, uint256 amountRaised, uint256 poolSupply) public returns (address poolAddress){
         poolAddress = IPoolFactory(aerodromePoolFactory).createPool(xToken, fUSDC, false);
         IERC20(xToken).approve(aerodromeRouter, poolSupply);
-        IERC20(fUSDC).approve(aerodromeRouter, amountRaised);
+        IERC20(fUSDC).approve(aerodromeRouter, 1e8);
         IRouter(aerodromeRouter).addLiquidity(
             xToken, 
             fUSDC,
             false,
             poolSupply,
-            amountRaised,
+            1e8,
             poolSupply,
             amountRaised,
             address(this), 
