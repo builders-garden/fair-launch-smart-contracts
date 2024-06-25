@@ -6,9 +6,9 @@ interface IHippodromeTypes {
         address founder;//═════════════════════════════╗ 
         uint96  poolSupply;//══════════════════════════╝
         address tokenAddress;//════════════════════════╗ 
-        uint56  currentStake;//════════════════════════╝ 
+        uint256  currentStake;//════════════════════════╝ 
         address poolAddress;//═════════════════════════╗ 
-        uint56  raised;//══════════════════════════════╝ 
+        uint256  raised;//══════════════════════════════╝ 
         uint88  startTimestamp;//══════════════════════╗ 
         uint88  endTimestamp;//════════════════════════╝ 
         uint88  unvestStart;//═════════════════════════╗ 

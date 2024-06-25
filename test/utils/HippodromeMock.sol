@@ -17,15 +17,16 @@ import "@aerodrome/interfaces/IRouter.sol";
 
 contract HippodromeMock is IERC721Receiver, IHippodrome {
     address public fUSDC;
+    uint8 public _poolID = 1;
+    uint24 constant contributionPrecision = 1e5; 
+    
     address public accountRouter;
     address public wrapProxy;
     address public sUSDC;
     address public aerodromePoolFactory;
     address public aerodromeRouter;
     address public mockLiquidityToken;
-    uint public _campaignCounter;
-    uint128 public _poolID = 1;
-    uint constant contributionPrecision = 1e5;
+    uint public _campaignCounter; 
 
     mapping(uint => Campaign) public s_campaigns;
     mapping(uint => uint128) public s_campaignAccounts;
@@ -279,8 +280,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint256 amountToMint = (amount * 20) / 100;
         MockLiquidityToken(mockLiquidityToken).mint(amountToMint);
 
-        s_campaigns[campaignID].currentStake += uint56(amount);
-        s_campaigns[campaignID].raised += uint56(amountToMint);
+        s_campaigns[campaignID].currentStake += uint256(amount);
+        s_campaigns[campaignID].raised += uint256(amountToMint);
 
         _updateAddContribution(msg.sender, campaignID, amount);
     }
@@ -297,7 +298,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         Campaign memory campaign = s_campaigns[campaignID];
         (claimableD18, distributors) = IRewardsManagerModule(accountRouter)
             .updateRewards(_poolID, sUSDC, accountID);
-        s_campaigns[campaignID].raised += uint56(claimableD18[0]);
+        s_campaigns[campaignID].raised += uint256(claimableD18[0]);
         IRewardsManagerModule(accountRouter).claimRewards(
             accountID,
             _poolID,
@@ -321,7 +322,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             sUSDC,
             accountID
         );
-        s_campaigns[campaignID].currentStake -= uint56(amount);
+        s_campaigns[campaignID].currentStake -= uint256(amount);
         _updateWithdrawContribution(msg.sender, campaignID, amount);
 
         ICollateralModule(accountRouter).withdraw(accountID, sUSDC, amount);

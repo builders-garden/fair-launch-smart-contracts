@@ -198,7 +198,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         IERC20(fUSDC).transferFrom(msg.sender, address(this), value);
         IERC20(fUSDC).approve(positionModule, value);
         _delegatePool(value);
-        s_campaigns[campaignID].currentStake += uint56(value);
+        s_campaigns[campaignID].currentStake += uint256(value);
         _updateAddContribution(msg.sender, campaignID, value);
     }
 
@@ -230,7 +230,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         uint128 accountID = s_campaignAccounts[campaignID];
         Campaign memory campaign = s_campaigns[campaignID];
         (claimableD18, distributors) = IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
-        s_campaigns[campaignID].raised += uint56(claimableD18[0]);
+        s_campaigns[campaignID].raised += uint256(claimableD18[0]);
         IRewardsManagerModule(accountRouter).claimRewards(accountID, _poolID, sUSDC, distributors[0]);
         _withdrawFundsFromAccount(campaign.currentStake);
     }
@@ -242,7 +242,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
         require(userStake >= amount, "");
         _withdrawFundsFromAccount(campaign.currentStake);
         IRewardsManagerModule(accountRouter).updateRewards(_poolID, sUSDC, accountID);
-        s_campaigns[campaignID].currentStake -= uint56(amount);
+        s_campaigns[campaignID].currentStake -= uint256(amount);
         _updateWithdrawContribution(msg.sender, campaignID, amount);
     }
 
