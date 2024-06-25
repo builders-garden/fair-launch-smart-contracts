@@ -110,11 +110,16 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             "Hippodrome: claimed"
         );
         Campaign memory campaign = s_campaigns[campaignID];
+        uint256 amount = s_userStakes[msg.sender][campaignID];
+        uint128 accountID = s_campaignAccounts[campaignID];
 
         IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
-        s_claims[msg.sender][campaignID] = rewards;
+        _redeemFromSyntethix(accountID, amount);
 
         emit RewardsClaimed(campaignID, msg.sender, rewards);
+
+        s_claims[msg.sender][campaignID] = rewards;
+        s_userStakes[msg.sender][campaignID] = 0;
     }
 
     // either make it callable by anyone or automate
@@ -267,18 +272,19 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
 
         // wrap
         IERC20(memoryFUsdc).approve(wrapProxy, amount);
-        IWrapperModule(wrapProxy).wrap(1, amount, 0);
+        IWrapperModule(wrapProxy).wrap(1, amount, 0); // from 6 decimals to 18
         
 
         // deposit
-        IERC20(memorySUsdc).approve(accountRouter, 1e18);
-        ICollateralModule(accountRouter).deposit(accountID, memorySUsdc, amount);
+        uint256 adjustedAmount =  amount* 1e12;
+        IERC20(memorySUsdc).approve(accountRouter, adjustedAmount);
+        ICollateralModule(accountRouter).deposit(accountID, memorySUsdc,  adjustedAmount);
 
         // make esteem of apy and mint some mockERC20 to use as liquidity 
         // apy is always at 20%
         // unfortunately synthetix delegate function has some very-hard-to-debug-spaghetti-solidity-code-and-errors so we can only mock that
         // the following replace delegate from synthetix
-        uint256 amountToMint = (amount * 20) / 100;
+        uint256 amountToMint = (adjustedAmount * 20) / 100;
         MockLiquidityToken(mockLiquidityToken).mint(amountToMint);
 
         s_campaigns[campaignID].currentStake += uint256(amount);
@@ -306,6 +312,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             sUSDC,
             distributors[0]
         );
+        // get back user tokens (fusdc)
+       
         // _withdrawFundsFromAccount(campaign.currentStake);
     }
 
@@ -325,9 +333,14 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         );
         s_campaigns[campaignID].currentStake -= uint256(amount);
         _updateWithdrawContribution(msg.sender, campaignID, amount);
+        _redeemFromSyntethix(accountID, amount);
+    }
 
-        ICollateralModule(accountRouter).withdraw(accountID, sUSDC, amount);
-        IWrapperModule(wrapProxy).unwrap(1, 1e18, 0);
+    
+    function _redeemFromSyntethix(uint128 accountID, uint amount) public {
+        uint256 adjustedAmount =  amount* 1e12;
+        ICollateralModule(accountRouter).withdraw(accountID, sUSDC, adjustedAmount);
+        IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
     }
 
     function _createAerodromePoolAndAddLiquidity(
