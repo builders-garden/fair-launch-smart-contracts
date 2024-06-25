@@ -120,6 +120,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     // either make it callable by anyone or automate
     function resolveCampaign(uint128 campaignID) external override {
         Campaign memory campaign = s_campaigns[campaignID];
+
         _claimSynthetixRewards(campaignID);
         campaign.poolAddress = _createAerodromePoolAndAddLiquidity(
             campaign.tokenAddress,
@@ -336,19 +337,19 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     ) public returns (address poolAddress) {
         poolAddress = IPoolFactory(aerodromePoolFactory).createPool(
             xToken,
-            fUSDC,
+            mockLiquidityToken,
             false
         );
         IERC20(xToken).approve(aerodromeRouter, poolSupply);
-        IERC20(fUSDC).approve(aerodromeRouter, 1e8);
+        IERC20(mockLiquidityToken).approve(aerodromeRouter, amountRaised);
         IRouter(aerodromeRouter).addLiquidity(
             xToken,
-            fUSDC,
+            mockLiquidityToken,
             false,
             poolSupply,
-            1e8,
-            poolSupply,
             amountRaised,
+            poolSupply,
+            0,
             address(this),
             block.timestamp
         );
