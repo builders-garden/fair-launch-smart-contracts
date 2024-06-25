@@ -130,11 +130,16 @@ contract HippodromeTest is Test, IERC721Receiver {
         IERC20(fUSDC).approve(address(hd), 1e30);
         // createCampaign();
         hd.fundCampaign(1, 1e8);
+        // warp 30 days ahead
+        vm.warp(block.timestamp + 90 days);
+
         IERC20(sUSDC).approve(address(hd), 1e30);
         // assert user balance = 0 after funding
         (uint256[] memory claimableD18, address[] memory distributors) = hd
             ._claimSynthetixRewards(1);
         hd.resolveCampaign(1);
+        
+        hd.claimRewards(1);
     }
 
     //║══════════════════════════════════════════╗

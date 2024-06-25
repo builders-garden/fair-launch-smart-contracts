@@ -114,8 +114,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint128 accountID = s_campaignAccounts[campaignID];
 
         IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
-        _redeemFromSyntethix(accountID, amount);
-
+        
         emit RewardsClaimed(campaignID, msg.sender, rewards);
 
         s_claims[msg.sender][campaignID] = rewards;
@@ -338,7 +337,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
 
     
     function _redeemFromSyntethix(uint128 accountID, uint amount) public {
-        uint256 adjustedAmount =  amount* 1e12;
+        uint256 adjustedAmount =  amount * 1e12;
         ICollateralModule(accountRouter).withdraw(accountID, sUSDC, adjustedAmount);
         IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
     }
