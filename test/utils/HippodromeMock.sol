@@ -7,6 +7,7 @@ import {ICollateralModule} from "../../src/interfaces/ICollateralModule.sol";
 import {IVaultModule} from "../../src/interfaces/IVault.sol";
 import {IRewardsManagerModule} from "../../src/interfaces/IRewardsManagerModule.sol";
 import {IWrapperModule} from "../../src/interfaces/IWrapperModule.sol";
+import {MockLiquidityToken} from "./MockLiquidityToken.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/Token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -21,6 +22,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     address public sUSDC;
     address public aerodromePoolFactory;
     address public aerodromeRouter;
+    address public mockLiquidityToken;
     uint public _campaignCounter;
     uint128 public _poolID = 1;
     uint constant contributionPrecision = 1e5;
@@ -59,6 +61,11 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         sUSDC = _sUSDC;
         aerodromePoolFactory = _aerodromePoolFactory;
         aerodromeRouter = _aerodromeRouter;
+
+        MockLiquidityToken mlt = new MockLiquidityToken();
+        mockLiquidityToken = address(mlt);
+
+
     }
 
     //║══════════════════════════════════════════╗
@@ -87,12 +94,12 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint128 campaignID,
         uint amount
     ) external override onlyActiveCampaign(campaignID) {
-        require(
-            s_depositTimestamps[msg.sender][campaignID] < 10 days,
-            "Synthetix claim period isn't  over"
-        );
-        s_userStakes[msg.sender][campaignID] -= amount;
+        // require(
+        //     s_depositTimestamps[msg.sender][campaignID] < 10 days,
+        //     "Synthetix claim period isn't  over"
+        // );
         _claimUserCollateral(campaignID, msg.sender, amount);
+        s_userStakes[msg.sender][campaignID] -= amount;
     }
 
     function claimRewards(uint128 campaignID) external override {
@@ -260,11 +267,20 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         IERC20(memoryFUsdc).approve(wrapProxy, amount);
         IWrapperModule(wrapProxy).wrap(1, amount, 0);
         
+
         // deposit
         IERC20(memorySUsdc).approve(accountRouter, 1e18);
         ICollateralModule(accountRouter).deposit(accountID, memorySUsdc, amount);
 
+        // make esteem of apy and mint some mockERC20 to use as liquidity 
+        // apy is always at 20%
+        // unfortunately synthetix delegate function has some very-hard-to-debug-spaghetti-solidity-code-and-errors so we can only mock that
+        // the following replace delegate from synthetix
+        uint256 amountToMint = (amount * 20) / 100;
+        MockLiquidityToken(mockLiquidityToken).mint(amountToMint);
+
         s_campaigns[campaignID].currentStake += uint56(amount);
+        s_campaigns[campaignID].raised += uint56(amountToMint);
 
         _updateAddContribution(msg.sender, campaignID, amount);
     }
