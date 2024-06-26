@@ -31,7 +31,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     address internal aerodromePoolFactory;
     address internal aerodromeRouter;
     address internal mockLiquidityToken;
-    uint internal _campaignCounter; 
+    uint public _campaignCounter; 
 
     mapping(uint => Campaign) internal s_campaigns;
     mapping(uint => uint128) internal s_campaignAccounts;
