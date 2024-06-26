@@ -1,17 +1,48 @@
 [
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_accountRouter",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_fUSDC",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_wrapModule",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_sUSDC",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_aerodromePoolFactory",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_aerodromeRouter",
+				"type": "address"
+			}
+		],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
 	{
 		"inputs": [],
-		"name": "CampaignEnded",
+		"name": "CampaignAlreadyExist",
 		"type": "error"
 	},
 	{
 		"inputs": [],
-		"name": "CampaignNotStarted",
+		"name": "CampaignNotActive",
 		"type": "error"
 	},
 	{
@@ -63,9 +94,9 @@
 						"type": "address"
 					},
 					{
-						"internalType": "uint56",
+						"internalType": "uint256",
 						"name": "currentStake",
-						"type": "uint56"
+						"type": "uint256"
 					},
 					{
 						"internalType": "address",
@@ -73,9 +104,9 @@
 						"type": "address"
 					},
 					{
-						"internalType": "uint56",
+						"internalType": "uint256",
 						"name": "raised",
-						"type": "uint56"
+						"type": "uint256"
 					},
 					{
 						"internalType": "uint88",
@@ -101,6 +132,11 @@
 						"internalType": "uint96",
 						"name": "rewardSupply",
 						"type": "uint96"
+					},
+					{
+						"internalType": "string",
+						"name": "campaignURI",
+						"type": "string"
 					}
 				],
 				"indexed": false,
@@ -349,6 +385,123 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "campaignID",
+				"type": "uint256"
+			}
+		],
+		"name": "getCampaign",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint96",
+				"name": "",
+				"type": "uint96"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint88",
+				"name": "",
+				"type": "uint88"
+			},
+			{
+				"internalType": "uint88",
+				"name": "",
+				"type": "uint88"
+			},
+			{
+				"internalType": "uint88",
+				"name": "",
+				"type": "uint88"
+			},
+			{
+				"internalType": "uint88",
+				"name": "",
+				"type": "uint88"
+			},
+			{
+				"internalType": "uint96",
+				"name": "",
+				"type": "uint96"
+			},
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "campaignID",
+				"type": "uint256"
+			}
+		],
+		"name": "getCampaignAccountId",
+		"outputs": [
+			{
+				"internalType": "uint128",
+				"name": "accountID",
+				"type": "uint128"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "campaignID",
+				"type": "uint256"
+			}
+		],
+		"name": "getCampaignTokenInfos",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "symbol",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint128",
 				"name": "campaignID",
 				"type": "uint128"
@@ -363,7 +516,7 @@
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "totalRewards",
+				"name": "totalUserRewards",
 				"type": "uint256"
 			},
 			{
@@ -373,6 +526,64 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint128",
+				"name": "campaignID",
+				"type": "uint128"
+			}
+		],
+		"name": "getUserStake",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "onERC721Received",
+		"outputs": [
+			{
+				"internalType": "bytes4",
+				"name": "",
+				"type": "bytes4"
+			}
+		],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{

@@ -23,7 +23,14 @@ interface IHippodrome is IHippodromeTypes{
     function claimRewards(uint128 campaignID) external ;
     function resolveCampaign(uint128 campaignID) external ;
 
+    function getCampaign(uint) external view returns (
+        address, uint96, address, uint, address, uint, uint88, uint88, uint88, uint88, uint96, string memory
+    );
+    function getCampaignTokenInfos(uint) external view returns(string memory, string memory);
     function getAvailableUserRewards(address user, uint128 campaignID) external view  returns (uint);
     function calculateContributionPercentage(uint128 campaignID, address user) external view  returns (uint);
     function getUserRewardStatus(uint128 campaignID, address user) external view  returns(uint, uint);
-} 
+    function getCampaignAccountId(uint) external view returns(uint128);
+    function getUserStake(address user, uint128 campaignID) external view returns(uint);
+
+}

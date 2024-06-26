@@ -10,10 +10,15 @@ import {IWrapperModule} from "../../src/interfaces/IWrapperModule.sol";
 import {MockLiquidityToken} from "./MockLiquidityToken.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/Token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/Token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@aerodrome/interfaces/factories/IPoolFactory.sol";
 import "@aerodrome/interfaces/IPool.sol";
 import "@aerodrome/interfaces/IRouter.sol";
+
+
+// this contract is an hackaton project which isnt production ready
+// avoid deploying this contract on mainnet
 
 contract HippodromeMock is IERC721Receiver, IHippodrome {
     address public fUSDC;
@@ -101,28 +106,35 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         // );
         _claimUserCollateral(campaignID, msg.sender, amount);
         s_userStakes[msg.sender][campaignID] -= amount;
+
+        emit FundsWithdrawed(campaignID, msg.sender, amount);
     }
 
     function claimRewards(uint128 campaignID) external override {
         uint rewards = _getUserRewards(msg.sender, campaignID);
+        uint256 stake = s_userStakes[msg.sender][campaignID];
+        if (stake > 0){
+            IERC20(fUSDC).transfer(msg.sender, stake);
+            delete s_userStakes[msg.sender][campaignID];
+        }
         require(
             rewards > s_claims[msg.sender][campaignID],
             "Hippodrome: claimed"
         );
         Campaign memory campaign = s_campaigns[campaignID];
-        uint256 amount = s_userStakes[msg.sender][campaignID];
+        
         uint128 accountID = s_campaignAccounts[campaignID];
-
         IERC20(campaign.tokenAddress).transfer(msg.sender, rewards);
+        s_claims[msg.sender][campaignID] = rewards;
         
         emit RewardsClaimed(campaignID, msg.sender, rewards);
 
-        s_claims[msg.sender][campaignID] = rewards;
-        s_userStakes[msg.sender][campaignID] = 0;
     }
 
     // either make it callable by anyone or automate
     function resolveCampaign(uint128 campaignID) external override {
+        require(block.timestamp > s_campaigns[campaignID].endTimestamp && !s_campaignResolved[campaignID],
+        "Hippodrome: Campaign already solved");
         Campaign memory campaign = s_campaigns[campaignID];
 
         _claimSynthetixRewards(campaignID);
@@ -132,11 +144,18 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             campaign.poolSupply
         );
         s_campaignResolved[campaignID] = true;
-    }
 
+        emit CampaignTerminated(campaignID,  campaign.raised);
+    }
+    
     //║═════════════════════════════════════════╗
     //║             VIEW FUNCTIONS              ║
     //║═════════════════════════════════════════╝
+
+    
+    function getUserStake(address user, uint128 campaignID) external view override returns(uint){
+        return s_userStakes[user][campaignID];
+    }
 
     function getAvailableUserRewards(
         address user,
@@ -155,18 +174,50 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function getUserRewardStatus(
         uint128 campaignID,
         address user
-    ) external view override returns (uint totalRewards, uint claimed) {
+    ) external view override returns (uint totalUserRewards, uint claimed) {
         uint contributionPercentage = _calculateContributionPercentage(
             campaignID,
             user
         );
         Campaign memory campaign = s_campaigns[campaignID];
-        totalRewards =
+        totalUserRewards =
             (uint(campaign.rewardSupply) * contributionPercentage) /
             contributionPrecision;
         claimed = s_claims[user][campaignID];
     }
 
+
+    function getCampaignTokenInfos(uint campaignID) external view override returns (string memory name, string memory symbol) {
+        Campaign memory campaign = s_campaigns[campaignID];
+        return (
+            IERC20Metadata(campaign.tokenAddress).name(),
+            IERC20Metadata(campaign.tokenAddress).symbol()
+        );
+    }
+
+    function getCampaign(uint campaignID) external view override returns (
+        address, uint96, address, uint, address, uint, uint88, uint88, uint88, uint88, uint96, string memory
+    ) {
+        Campaign memory campaign = s_campaigns[campaignID];
+        return (
+            campaign.founder, 
+            campaign.poolSupply, 
+            campaign.tokenAddress, 
+            campaign.currentStake,
+            campaign.poolAddress,
+            campaign.raised,
+            campaign.startTimestamp, 
+            campaign.endTimestamp, 
+            campaign.unvestStart,
+            campaign.unvestEnd,
+            campaign.rewardSupply,
+            campaign.campaignURI
+        );
+    }
+
+    function getCampaignAccountId(uint campaignID) public view override returns(uint128 accountID){
+        accountID = s_campaignAccounts[campaignID];
+    }
     //║═════════════════════════════════════════╗
     //║            public FUNCTIONS             ║
     //║═════════════════════════════════════════╝
@@ -206,7 +257,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
             currentTime = streamEnd;
         }
 
-        uint totalRewards = (uint(campaign.rewardSupply) *
+        uint totalUserRewards = (uint(campaign.rewardSupply) *
             contributionPercentage) / contributionPrecision;
 
         uint elapsedTime = currentTime - streamStart;
@@ -215,7 +266,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         uint claimedRewards = s_claims[user][campaignID];
 
         rewards =
-            ((totalRewards * elapsedTime) / streamDuration) -
+            ((totalUserRewards * elapsedTime) / streamDuration) -
             claimedRewards;
     }
 
@@ -280,8 +331,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         ICollateralModule(accountRouter).deposit(accountID, memorySUsdc,  adjustedAmount);
 
         // make esteem of apy and mint some mockERC20 to use as liquidity 
-        // apy is always at 20%
-        // unfortunately synthetix delegate function has some very-hard-to-debug-spaghetti-solidity-code-and-errors so we can only mock that
+        // apy is mocked at 20%
+        // unfortunately synthetix delegate function has some very-hard-to-debug-solidity-code-and-errors so we can only mock that
+        // nontheless testnet would require a simulation environemt, as it may easyly return negative apy. So we opted for a mock
         // the following replace delegate from synthetix
         uint256 amountToMint = (adjustedAmount * 20) / 100;
         MockLiquidityToken(mockLiquidityToken).mint(amountToMint);

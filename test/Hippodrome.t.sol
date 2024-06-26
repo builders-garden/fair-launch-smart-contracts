@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {XToken} from "./utils/xToken.sol";
 import "./utils/HippodromeMock.sol";
 import {IHippodromeTypes} from "../src/interfaces//types/IHippodromeTypes.sol";
-import {ICollateralModule} from "../src/interfaces/ICollateralModule.sol";
+import {ICollateralModule} from "./interfaces/ICollateralModule.sol";
 import {IWrapperModule} from "../src/interfaces/IWrapperModule.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
@@ -139,7 +139,10 @@ contract HippodromeTest is Test, IERC721Receiver {
             ._claimSynthetixRewards(1);
         hd.resolveCampaign(1);
         
+
+        // finally claim rewards
         hd.claimRewards(1);
+        
     }
 
     //║══════════════════════════════════════════╗
