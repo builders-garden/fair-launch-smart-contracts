@@ -25,7 +25,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     uint8 public _poolID = 1;
     uint24 constant contributionPrecision = 1e5; 
     
-    address public accountRouter;
+    address public synthCoreProxy;
     address public wrapProxy;
     address public sUSDC;
     address public aerodromePoolFactory;
@@ -54,14 +54,14 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     }
 
     constructor(
-        address _accountRouter,
+        address _synthCoreProxy,
         address _fUSDC,
         address _wrapModule,
         address _sUSDC,
         address _aerodromePoolFactory,
         address _aerodromeRouter
     ) {
-        accountRouter = _accountRouter;
+        synthCoreProxy = _synthCoreProxy;
         fUSDC = _fUSDC;
         wrapProxy = _wrapModule;
         sUSDC = _sUSDC;
@@ -70,8 +70,6 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
 
         MockLiquidityToken mlt = new MockLiquidityToken();
         mockLiquidityToken = address(mlt);
-
-
     }
 
     //║══════════════════════════════════════════╗
@@ -81,6 +79,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     function createCampaign(
         CampaignParams memory campaignParams
     ) external override returns (uint128 accountID) {
+        
         if (s_tokens[campaignParams.tokenAddress])
             revert CampaignAlreadyExist();
         ++_campaignCounter;
@@ -111,6 +110,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     }
 
     function claimRewards(uint128 campaignID) external override {
+        require(s_campaignResolved[campaignID], "Hippodrome: campaign not resolved yet");
         uint rewards = _getUserRewards(msg.sender, campaignID);
         uint256 stake = s_userStakes[msg.sender][campaignID];
         if (stake > 0){
@@ -152,7 +152,10 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     //║             VIEW FUNCTIONS              ║
     //║═════════════════════════════════════════╝
 
-    
+    function isCampaignResolved(uint128 campaignID) external view override returns(bool){
+        return s_campaignResolved[campaignID];
+    }
+
     function getUserStake(address user, uint128 campaignID) external view override returns(uint){
         return s_userStakes[user][campaignID];
     }
@@ -284,7 +287,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         );
 
         // create Synthetix Account
-        accountID = IAccountModule(accountRouter).createAccount();
+        accountID = IAccountModule(synthCoreProxy).createAccount();
         // map the id
         s_campaignAccounts[_campaignCounter] = accountID;
         // map the campaign params
@@ -327,8 +330,8 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
 
         // deposit
         uint256 adjustedAmount =  amount* 1e12;
-        IERC20(memorySUsdc).approve(accountRouter, adjustedAmount);
-        ICollateralModule(accountRouter).deposit(accountID, memorySUsdc,  adjustedAmount);
+        IERC20(memorySUsdc).approve(synthCoreProxy, adjustedAmount);
+        ICollateralModule(synthCoreProxy).deposit(accountID, memorySUsdc,  adjustedAmount);
 
         // make esteem of apy and mint some mockERC20 to use as liquidity 
         // apy is mocked at 20%
@@ -354,10 +357,10 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         // 10 days on synthetix before claim is available
         uint128 accountID = s_campaignAccounts[campaignID];
         Campaign memory campaign = s_campaigns[campaignID];
-        (claimableD18, distributors) = IRewardsManagerModule(accountRouter)
+        (claimableD18, distributors) = IRewardsManagerModule(synthCoreProxy)
             .updateRewards(_poolID, sUSDC, accountID);
         s_campaigns[campaignID].raised += uint256(claimableD18[0]);
-        IRewardsManagerModule(accountRouter).claimRewards(
+        IRewardsManagerModule(synthCoreProxy).claimRewards(
             accountID,
             _poolID,
             sUSDC,
@@ -377,7 +380,7 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
         Campaign memory campaign = s_campaigns[campaignID];
         uint userStake = s_userStakes[msg.sender][campaignID];
         require(userStake >= amount, "");
-        IRewardsManagerModule(accountRouter).updateRewards(
+        IRewardsManagerModule(synthCoreProxy).updateRewards(
             _poolID,
             sUSDC,
             accountID
@@ -390,8 +393,9 @@ contract HippodromeMock is IERC721Receiver, IHippodrome {
     
     function _redeemFromSyntethix(uint128 accountID, uint amount) public {
         uint256 adjustedAmount =  amount * 1e12;
-        ICollateralModule(accountRouter).withdraw(accountID, sUSDC, adjustedAmount);
-        IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
+        ICollateralModule(synthCoreProxy).withdraw(accountID, sUSDC, adjustedAmount);
+        (uint returnedFusdc, ) = IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
+        IERC20(fUSDC).transfer(msg.sender, returnedFusdc);
     }
 
     function _createAerodromePoolAndAddLiquidity(

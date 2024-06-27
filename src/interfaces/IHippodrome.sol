@@ -32,5 +32,5 @@ interface IHippodrome is IHippodromeTypes{
     function getUserRewardStatus(uint128 campaignID, address user) external view  returns(uint, uint);
     function getCampaignAccountId(uint) external view returns(uint128);
     function getUserStake(address user, uint128 campaignID) external view returns(uint);
-
+    function isCampaignResolved(uint128 campaignID) external view returns(bool);
 }

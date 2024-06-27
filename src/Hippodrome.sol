@@ -109,6 +109,7 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     }
 
     function claimRewards(uint128 campaignID) external override {
+        require(s_campaignResolved[campaignID], "Hippodrome: campaign not resolved yet");
         uint rewards = _getUserRewards(msg.sender, campaignID);
         uint256 stake = s_userStakes[msg.sender][campaignID];
         if (stake > 0){
@@ -150,6 +151,11 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     //║═════════════════════════════════════════╗
     //║             VIEW FUNCTIONS              ║
     //║═════════════════════════════════════════╝
+
+
+    function isCampaignResolved(uint128 campaignID) external view override returns(bool){
+        return s_campaignResolved[campaignID];
+    }
 
     function getUserStake(address user, uint128 campaignID) external view override returns(uint){
         return s_userStakes[user][campaignID];
@@ -389,7 +395,8 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     function _redeemFromSyntethix(uint128 accountID, uint amount) internal {
         uint256 adjustedAmount =  amount * 1e12;
         ICollateralModule(synthCoreProxy).withdraw(accountID, sUSDC, adjustedAmount);
-        IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
+        (uint returnedFusdc, ) = IWrapperModule(wrapProxy).unwrap(1, adjustedAmount, 0);
+        IERC20(fUSDC).transfer(msg.sender, returnedFusdc);
     }
 
     function _createAerodromePoolAndAddLiquidity(

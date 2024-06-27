@@ -3,16 +3,16 @@ pragma solidity ^0.8.24;
 
 interface IHippodromeTypes {
     struct Campaign{
-        address founder;//═════════════════════════════╗ 
-        uint96  poolSupply;//══════════════════════════╝
-        address tokenAddress;//════════════════════════╗ 
-        uint256  currentStake;//════════════════════════╝ 
-        address poolAddress;//═════════════════════════╗ 
-        uint256  raised;//══════════════════════════════╝ 
-        uint88  startTimestamp;//══════════════════════╗ 
-        uint88  endTimestamp;//════════════════════════╝ 
-        uint88  unvestStart;//═════════════════════════╗ 
-        uint88  unvestEnd;//═══════════════════════════╝ 
+        address founder;
+        uint96  poolSupply;
+        address tokenAddress;
+        uint256  currentStake;
+        address poolAddress;
+        uint256  raised;
+        uint88  startTimestamp;
+        uint88  endTimestamp;
+        uint88  unvestStart;
+        uint88  unvestEnd;
         uint96  rewardSupply;
         string  campaignURI; 
     }
