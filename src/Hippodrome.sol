@@ -79,6 +79,16 @@ contract Hippodrome is IERC721Receiver, IHippodrome {
     function createCampaign(
         CampaignParams memory campaignParams
     ) external override returns (uint128 accountID) {
+        if (campaignParams.startTimestamp < block.timestamp ||
+            campaignParams.endTimestamp < campaignParams.startTimestamp
+            ){
+                revert InvalidCampaignTimeRange();
+        }
+        if  (campaignParams.unvestingStreamStart > campaignParams.endTimestamp || 
+            campaignParams.unvestingStreamEnd < campaignParams.unvestingStreamStart
+            ){
+                revert InvalidStreamTimeRange();
+        }
         if (s_tokens[campaignParams.tokenAddress])
             revert CampaignAlreadyExist();
         ++_campaignCounter;

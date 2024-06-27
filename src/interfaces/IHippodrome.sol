@@ -15,6 +15,8 @@ interface IHippodrome is IHippodromeTypes{
     error WithdrawLocked(uint256 unlockTime);
     error RewardsAlreadyClaimed();
     error CampaignAlreadyExist();
+    error InvalidCampaignTimeRange();
+    error InvalidStreamTimeRange();
     // other errors 
 
     function createCampaign(CampaignParams memory campaignParams) external  returns(uint128 accountID);
