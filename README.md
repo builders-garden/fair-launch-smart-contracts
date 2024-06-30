@@ -2,6 +2,9 @@
 Hippodrome is a project built during Base Buidlathon, currently deployed on base sepolia. The platform is intended to be used by Founders that need to launch their own token during a campaign to raise interest and funds.
 Hippodrome is built on base sepolia and integrates Synthetix V3 and Aerodrome 
 
+![image](https://github.com/builders-garden/fair-launch-smart-contracts/assets/104315978/6df9fd3c-b733-45a8-a324-4e5f952b301d)
+![image](https://github.com/builders-garden/fair-launch-smart-contracts/assets/104315978/444ab386-adcb-4203-8b33-202ad008660a)
+
 # The protocol
 ## General purpose
 Users can support a project by sending USDC to Hippodrome. Hippodrome then deposit these tokens on the campaign associated Account on Synthetix, thus delegating the funds to a pool that return a % APR.
